@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+
+<div style="background: #f8f9fa; border-radius: 8px; padding: 30px;">
+    <h2 style="color: #333; margin-top: 0;">Student Milestone Alert</h2>
+
+    <p>Dear {{ supervisor_name }},</p>
+
+    <p>This is to inform you about the following student milestone:</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight: bold;">Student</td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{ student_name }} ({{ student_id_number }})</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight: bold;">Milestone</td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{ milestone_name }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd; font-weight: bold;">Due Date</td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{ expected_date }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px; font-weight: bold;">Status</td>
+            <td style="padding: 8px;">
+                {% if days_left > 7 %}
+                <span style="color: #28a745;">{{ days_left }} days remaining</span>
+                {% elif days_left > 0 %}
+                <span style="color: #ffc107; font-weight: bold;">{{ days_left }} days remaining - Urgent</span>
+                {% else %}
+                <span style="color: #dc3545; font-weight: bold;">{{ days_left | abs }} days overdue</span>
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+
+    <p>Please follow up with the student to ensure timely completion.</p>
+
+    <p style="color: #666; font-size: 14px; margin-top: 30px;">
+        Best regards,<br>
+        Postgraduate Studies Office<br>
+        <em>This is an automated notification from the DataTrain system.</em>
+    </p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+
+<div style="background: #f8f9fa; border-radius: 8px; padding: 30px;">
+    <h2 style="color: #333; margin-top: 0;">Milestone Reminder</h2>
+
+    <p>Dear {{ student_name }},</p>
+
+    {% if days_left > 0 %}
+    <p>This is a friendly reminder that your <strong>{{ milestone_name }}</strong>
+    is due on <strong>{{ expected_date }}</strong>.</p>
+
+    <div style="background: {% if days_left <= 7 %}#fff3cd{% elif days_left <= 15 %}#d1ecf1{% else %}#d4edda{% endif %};
+                border-radius: 6px; padding: 15px; margin: 20px 0;">
+        <strong>{{ days_left }} days remaining</strong>
+    </div>
+
+    {% else %}
+    <p>Your <strong>{{ milestone_name }}</strong> was due on
+    <strong>{{ expected_date }}</strong> and is now <strong>overdue</strong>.</p>
+
+    <div style="background: #f8d7da; border-radius: 6px; padding: 15px; margin: 20px 0;">
+        <strong>{{ days_left | abs }} days overdue</strong>
+    </div>
+    {% endif %}
+
+    <p>Please contact your supervisor if you need any assistance or an extension.</p>
+
+    <p style="color: #666; font-size: 14px; margin-top: 30px;">
+        Best regards,<br>
+        Postgraduate Studies Office<br>
+        <em>This is an automated message from the DataTrain system.</em>
+    </p>
+</div>
+
+</body>
+</html>
