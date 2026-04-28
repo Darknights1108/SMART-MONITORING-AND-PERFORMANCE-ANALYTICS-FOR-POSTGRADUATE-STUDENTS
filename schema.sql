@@ -431,3 +431,21 @@ INSERT INTO reminder_rule (days_before, notify_student, notify_supervisor, notif
 (7,   TRUE,  TRUE,  FALSE, 'Critical'),
 (0,   TRUE,  TRUE,  TRUE,  'Critical');
 -- 0 = overdue (expected_date has passed)
+
+-- =====================
+-- 12. ML RISK PREDICTION
+-- =====================
+
+CREATE TABLE student_risk_prediction (
+    prediction_id       INT PRIMARY KEY AUTO_INCREMENT,
+    student_id          INT NOT NULL UNIQUE,
+    risk_score          DECIMAL(5,2) NOT NULL,
+    -- 0 = lowest risk, 100 = highest risk
+    risk_label          ENUM('Low', 'Medium', 'High') NOT NULL,
+    cluster_id          INT NOT NULL,
+    -- K-Means cluster (0, 1, 2)
+    key_risk_factors    TEXT NULL,
+    -- JSON array of human-readable risk reasons
+    predicted_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES student(student_id)
+);

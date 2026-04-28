@@ -313,6 +313,19 @@ class ChatHistory(Base):
 # 11. REMINDER RULES
 # =====================
 
+class StudentRiskPrediction(Base):
+    __tablename__ = "student_risk_prediction"
+    prediction_id    = Column(Integer, primary_key=True, autoincrement=True)
+    student_id       = Column(Integer, ForeignKey("student.student_id"), nullable=False, unique=True)
+    risk_score       = Column(DECIMAL(5, 2), nullable=False)
+    risk_label       = Column(Enum("Low", "Medium", "High"), nullable=False)
+    cluster_id       = Column(Integer, nullable=False)
+    key_risk_factors = Column(Text, nullable=True)   # JSON array string
+    predicted_at     = Column(DateTime, nullable=False, server_default=func.now())
+
+    student = relationship("Student")
+
+
 class ReminderRule(Base):
     __tablename__ = "reminder_rule"
     rule_id = Column(Integer, primary_key=True, autoincrement=True)
