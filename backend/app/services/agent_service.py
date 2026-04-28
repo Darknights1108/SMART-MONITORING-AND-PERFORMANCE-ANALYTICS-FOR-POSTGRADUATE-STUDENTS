@@ -163,13 +163,13 @@ def create_agent() -> ToolCallingAgent:
     return agent
 
 
-# Singleton agent instance
-_agent: ToolCallingAgent | None = None
-
-
 def get_agent() -> ToolCallingAgent:
-    """Get or create the singleton agent instance."""
-    global _agent
-    if _agent is None:
-        _agent = create_agent()
-    return _agent
+    """
+    Create a fresh agent instance for one WebSocket session.
+
+    Each connection gets its own agent so that:
+    - agent.run(..., reset=False) accumulates real conversation memory
+    - Multiple concurrent users never share state
+    - Memory is automatically released when the connection closes
+    """
+    return create_agent()
