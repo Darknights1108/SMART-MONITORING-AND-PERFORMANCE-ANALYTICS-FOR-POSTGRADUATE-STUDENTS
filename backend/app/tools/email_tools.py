@@ -2,7 +2,7 @@
 Smolagents tools for sending emails via the chatbox.
 
 Send flow (two-phase):
-  1. Agent calls send_email_to_student / send_email_to_supervisor
+  1. Agent calls send_email_to_student / send_email_to_supervisor / send_email_to_address
      → email is staged in _pending_sends, NOT sent yet
      → tool returns a draft preview asking for confirmation
   2. User replies with a confirmation word (y / yes / ok / 确认 / send / 发送)
@@ -75,7 +75,28 @@ def get_pending_summary() -> str:
     return "\n".join(lines)
 
 
-def execute_pending_sends() -> str:
+def get_pending_display() -> str:
+    """Return the full draft content of all pending emails for user review."""
+    if not _pending_sends:
+        return ""
+    blocks = []
+    for e in _pending_sends:
+        blocks.append(
+            f"To: {e['name']} <{e['email']}>\n"
+            f"Subject: {e['subject']}\n\n"
+            f"{e['body']}"
+        )
+    joined = "\n\n---\n\n".join(blocks)
+    return (
+        f"Here is the email draft for your review:\n\n"
+        f"{joined}\n\n"
+        f"---\n"
+        f"Does this look correct? Reply **send** to confirm and send it, "
+        f"**cancel** to discard, or tell me what to change."
+    )
+
+
+async def execute_pending_sends() -> str:
     """Actually send all staged emails. Called from chat.py on confirmation."""
     if not _pending_sends:
         return "No pending emails to send."
@@ -84,7 +105,6 @@ def execute_pending_sends() -> str:
     db = SyncSessionLocal()
     try:
         for entry in _pending_sends:
-            # Rate limit check at send time too
             now = time.time()
             recent = [t for t in _email_send_log if now - t < _RATE_WINDOW]
             _email_send_log.clear()
@@ -94,9 +114,8 @@ def execute_pending_sends() -> str:
                 continue
             _email_send_log.append(now)
 
-            success = asyncio.run(send_email(entry["email"], entry["subject"], entry["body"]))
+            success = await send_email(entry["email"], entry["subject"], entry["body"])
             if success:
-                # Log to DB if student email
                 if entry["type"] == "student" and entry.get("student_id"):
                     db.execute(text("""
                         INSERT INTO email_log
@@ -123,6 +142,18 @@ def execute_pending_sends() -> str:
 def clear_pending_sends() -> None:
     """Discard all staged emails (user cancelled)."""
     _pending_sends.clear()
+
+
+def stage_email_draft(to_email: str, recipient_name: str, subject: str, body: str) -> None:
+    """Stage a parsed text draft. Called by chat.py as a fallback when the model
+    drafts email as text output instead of calling a tool."""
+    _pending_sends.append({
+        "type": "address",
+        "name": recipient_name,
+        "email": to_email,
+        "subject": subject,
+        "body": body,
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +189,7 @@ def send_email_to_student(student_search: str, subject: str, body: str) -> str:
 
         student_id, student_name, student_email = student
 
+        _pending_sends.clear()  # replace any previous draft
         _pending_sends.append({
             "type": "student",
             "student_id": student_id,
@@ -168,11 +200,12 @@ def send_email_to_student(student_search: str, subject: str, body: str) -> str:
         })
 
         return (
-            f"📧 Email staged (NOT sent yet):\n"
+            f"Here is the email draft for your review:\n\n"
             f"  To: {student_name} <{student_email}>\n"
-            f"  Subject: {subject}\n"
+            f"  Subject: {subject}\n\n"
             f"  Body:\n{body}\n\n"
-            f"Reply with y / yes / ok / 确认 to send, or cancel to discard."
+            f"Does this look correct? Reply 'send' to confirm and send it, "
+            f"'cancel' to discard, or describe any changes you'd like."
         )
     finally:
         db.close()
@@ -207,6 +240,7 @@ def send_email_to_supervisor(supervisor_search: str, subject: str, body: str) ->
 
         sup_id, sup_name, sup_email = supervisor
 
+        _pending_sends.clear()  # replace any previous draft
         _pending_sends.append({
             "type": "supervisor",
             "supervisor_id": sup_id,
@@ -217,14 +251,55 @@ def send_email_to_supervisor(supervisor_search: str, subject: str, body: str) ->
         })
 
         return (
-            f"📧 Email staged (NOT sent yet):\n"
+            f"Here is the email draft for your review:\n\n"
             f"  To: {sup_name} <{sup_email}>\n"
-            f"  Subject: {subject}\n"
+            f"  Subject: {subject}\n\n"
             f"  Body:\n{body}\n\n"
-            f"Reply with y / yes / ok / 确认 to send, or cancel to discard."
+            f"Does this look correct? Reply 'send' to confirm and send it, "
+            f"'cancel' to discard, or describe any changes you'd like."
         )
     finally:
         db.close()
+
+
+@tool
+def send_email_to_address(to_email: str, recipient_name: str, subject: str, body: str) -> str:
+    """
+    Stage an email to any raw email address for user confirmation before sending.
+    Use this when the user provides a direct email address rather than a student name or ID.
+    The email is NOT sent immediately — it is queued and the user must confirm.
+
+    Args:
+        to_email: The recipient's email address (e.g. someone@example.com).
+        recipient_name: Display name for the recipient (use the email prefix if unknown).
+        subject: Email subject line.
+        body: Full email body content.
+    """
+    import re
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", to_email):
+        return f"Invalid email address: '{to_email}'."
+
+    body_err = _check_body_content(body)
+    if body_err:
+        return body_err
+
+    _pending_sends.clear()  # replace any previous draft
+    _pending_sends.append({
+        "type": "address",
+        "name": recipient_name,
+        "email": to_email,
+        "subject": subject,
+        "body": body,
+    })
+
+    return (
+        f"Here is the email draft for your review:\n\n"
+        f"  To: {recipient_name} <{to_email}>\n"
+        f"  Subject: {subject}\n\n"
+        f"  Body:\n{body}\n\n"
+        f"Does this look correct? Reply 'send' to confirm and send it, "
+        f"'cancel' to discard, or describe any changes you'd like."
+    )
 
 
 @tool
