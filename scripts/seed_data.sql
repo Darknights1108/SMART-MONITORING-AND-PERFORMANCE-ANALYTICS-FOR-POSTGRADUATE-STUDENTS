@@ -1,158 +1,363 @@
 -- ============================================
--- SEED DATA for development/testing
+-- SEED DATA — auto-generated from Excel
+-- Source: PHD_data - Copy.xlsx
+-- Generated: 2026-04-28 03:13
 -- ============================================
 
 USE datatrain;
 
 -- Regions
 INSERT INTO country_region (region_name) VALUES
-('East Asia'), ('South Asia'), ('Southeast Asia'), ('Middle East'), ('Europe'), ('Africa'), ('Americas');
+('East Asia'),
+('South Asia'),
+('Southeast Asia'),
+('Middle East'),
+('Europe'),
+('Africa'),
+('Americas');
 
 -- Countries
 INSERT INTO country (country_name, region_id) VALUES
-('China', 1), ('Japan', 1), ('South Korea', 1),
-('India', 2), ('Pakistan', 2), ('Bangladesh', 2),
-('Malaysia', 3), ('Indonesia', 3), ('Thailand', 3), ('Vietnam', 3),
-('Saudi Arabia', 4), ('Iran', 4),
-('United Kingdom', 5), ('Germany', 5),
-('Nigeria', 6), ('Kenya', 6),
-('United States', 7), ('Brazil', 7);
+('China', 1),
+('Japan', 1),
+('South Korea', 1),
+('India', 2),
+('Pakistan', 2),
+('Bangladesh', 2),
+('Malaysia', 3),
+('Indonesia', 3),
+('Thailand', 3),
+('Vietnam', 3),
+('Saudi Arabia', 4),
+('Iran', 4),
+('United Kingdom', 5),
+('Germany', 5),
+('Nigeria', 6),
+('Kenya', 6),
+('United States', 7),
+('Brazil', 7);
 
--- Faculties
+-- Faculties (faculty_id: 1=AI&Eng, 2=Business, 3=Applied Comm, 4=Law)
 INSERT INTO faculty (faculty_description) VALUES
 ('Faculty of AI and Engineering'),
-('Faculty of Business and Management'),
-('Faculty of Science'),
-('Faculty of Social Sciences and Humanities');
+('Faculty of Business'),
+('Faculty of Applied Comm'),
+('Faculty of Law');
 
 -- Programs
 INSERT INTO program (program_short_desc, program_description, faculty_id) VALUES
 ('Ph.D. (Eng)', 'Doctor of Philosophy (Engineering)', 1),
-('M.Sc. (CS)', 'Master of Science (Computer Science)', 1),
-('Ph.D. (Bus)', 'Doctor of Philosophy (Business)', 2),
-('M.B.A.', 'Master of Business Administration', 2),
-('Ph.D. (Sci)', 'Doctor of Philosophy (Science)', 3),
-('M.Sc. (Math)', 'Master of Science (Mathematics)', 3),
-('Ph.D. (SS)', 'Doctor of Philosophy (Social Science)', 4),
-('M.A. (Edu)', 'Master of Arts (Education)', 4);
+('Ph.D. (Mgmt.)', 'Doctor of Philosophy (Management)', 2),
+('Master (Mgmt)', 'Master of Management', 2),
+('Ph.D. (Communication)', 'Doctor of Philosophy (Communication)', 3),
+('Master (Communication)', 'Master of Communication', 3),
+('Master (Law)', 'Master of Law', 4);
 
 -- Disciplines
 INSERT INTO discipline (discipline_name, discipline_group) VALUES
-('Computer Science', 'STEM'), ('Electrical Engineering', 'STEM'),
-('Mechanical Engineering', 'STEM'), ('Data Science', 'STEM'),
-('Finance', 'Business'), ('Marketing', 'Business'),
-('Physics', 'STEM'), ('Chemistry', 'STEM'),
-('Education', 'Social Science'), ('Psychology', 'Social Science');
+('Engineering', 'STEM'),
+('Management', 'Business'),
+('Communication', 'Social Science'),
+('Law', 'Social Science'),
+('Data Science', 'STEM'),
+('Finance', 'Business');
 
 -- Funding types
 INSERT INTO funding_type (funding_name) VALUES
-('Full Scholarship'), ('Partial Scholarship'), ('Self-funded'),
-('Teaching Assistant'), ('Research Assistant'), ('Employer-sponsored');
+('Full Scholarship'),
+('Partial Scholarship'),
+('Self-funded'),
+('Teaching Assistant'),
+('Research Assistant'),
+('Employer-sponsored');
 
--- Campus
+-- Campus (1=CYBER, 2=MLAKA)
 INSERT INTO campus (campus_name) VALUES
-('Main Campus'), ('City Campus'), ('Online');
+('CYBER'),
+('MLAKA');
 
--- Sample Supervisors (password: "password123" hashed with bcrypt)
+-- Supervisors (password: 'password123'  bcrypt hash)
 INSERT INTO supervisor (staff_id, name, email, faculty_id, role, password_hash) VALUES
-('ADM001', 'Dr. Admin User', 'admin@university.edu', 1, 'Both',
-    '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6'),
-('MU081217', 'Dr. Ahmad Rahman', 'ahmad@university.edu', 1, 'Supervisor',
-    '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6'),
-('MU092301', 'Dr. Sarah Chen', 'sarah.chen@university.edu', 1, 'Supervisor',
-    '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6'),
-('MU103456', 'Prof. James Wilson', 'j.wilson@university.edu', 2, 'Supervisor',
-    '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6');
+('ADM001', 'Dr. Admin User', 'admin@university.edu', 1, 'Both', '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6'),
+('MU081217', 'Dr. Ahmad Rahman', 'ahmad@university.edu', 1, 'Supervisor', '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6'),
+('MU092301', 'Dr. Sarah Chen', 'sarah.chen@university.edu', 2, 'Supervisor', '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6'),
+('MU103456', 'Prof. James Wilson', 'j.wilson@university.edu', 3, 'Supervisor', '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6'),
+('MU114567', 'Dr. Fatimah Idris', 'fatimah@university.edu', 4, 'Supervisor', '$2b$12$LJ3m4ys3Gz8Kvf0fRsRXB.JpGpx/A6WfFkYzS.3VqYCxLDzFqzfO6');
 
--- Sample Students
-INSERT INTO student (student_id_number, student_name, email, campus_id, gender, date_of_birth, country_id, marital_status, num_children, youngest_child_age, program_id, degree_type, discipline_id, enrollment_date, entry_gpa, is_cross_discipline, study_method, funding_id, has_external_work, weekly_work_hours, in_research_group, family_support) VALUES
-('PGS2022001', 'Ali bin Hassan', 'ali.hassan@student.edu', 1, 'Male', '1995-03-15', 7, 'Married', 1, 2.5, 1, 'PhD', 1, '2022-03-01', 3.65, FALSE, 'Full-time', 1, FALSE, 0, TRUE, 4),
-('PGS2022002', 'Wei Lin Zhang', 'weilin.z@student.edu', 1, 'Female', '1996-08-20', 1, 'Single', 0, NULL, 1, 'PhD', 4, '2022-03-01', 3.80, TRUE, 'Full-time', 5, FALSE, 0, TRUE, 3),
-('PGS2022003', 'Priya Sharma', 'priya.s@student.edu', 1, 'Female', '1994-12-10', 4, 'Married', 2, 1.0, 2, 'Master', 1, '2022-09-01', 3.50, FALSE, 'Part-time', 3, TRUE, 20, FALSE, 5),
-('PGS2023001', 'John Smith', 'john.smith@student.edu', 1, 'Male', '1997-06-25', 13, 'Single', 0, NULL, 1, 'PhD', 2, '2023-03-01', 3.45, FALSE, 'Full-time', 1, FALSE, 0, TRUE, 3),
-('PGS2023002', 'Siti Nurhaliza', 'siti.n@student.edu', 2, 'Female', '1998-01-30', 7, 'Single', 0, NULL, 3, 'PhD', 5, '2023-03-01', 3.70, FALSE, 'Full-time', 2, FALSE, 0, FALSE, 4),
-('PGS2023003', 'Rajesh Kumar', 'rajesh.k@student.edu', 1, 'Male', '1993-04-18', 4, 'Married', 1, 3.0, 5, 'PhD', 7, '2023-09-01', 3.55, FALSE, 'Part-time', 6, TRUE, 15, TRUE, 2),
-('PGS2024001', 'Amy Tan', 'amy.tan@student.edu', 1, 'Female', '1999-09-05', 7, 'Single', 0, NULL, 2, 'Master', 1, '2024-03-01', 3.90, FALSE, 'Full-time', 4, FALSE, 0, TRUE, 5),
-('PGS2024002', 'Mohammed Al-Farsi', 'mohammed.af@student.edu', 1, 'Male', '1996-11-12', 11, 'Married', 0, NULL, 1, 'PhD', 3, '2024-03-01', 3.40, TRUE, 'Full-time', 1, FALSE, 0, FALSE, 3);
+-- Students (all 40 from Excel)
+INSERT INTO student (
+    student_id_number, student_name, campus_id,
+    campus_code, admit_term, admit_term_begin_date, expected_grad_term, program_status,
+    program_id, degree_type, enrollment_date, study_method,
+    is_cross_discipline, has_external_work, weekly_work_hours, in_research_group
+) VALUES
+('250PA247R8', 'USMAN YAU', 1, '247R1', 2500, '2025-01-01', 3000, 'Active in Program', 1, 'PhD', '2025-01-21', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PA247R1', 'KHAN IRFAN', 1, '247R4', 2500, '2025-01-01', 3000, 'Active in Program', 1, 'PhD', '2025-02-21', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PA247R2', 'JAYAKANTHAN A/L M. LACHMANAN', 1, '247R8', 2500, '2025-01-01', 3000, 'Active in Program', 1, 'PhD', '2025-02-08', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PA247R5', 'IDRIS OLALEKAN ADEOYE', 1, '247R3', 2500, '2025-01-01', 3000, 'Active in Program', 1, 'PhD', '2025-01-05', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PA247R7', 'NUHU DAN-AZUMI MUHAMMAD', 1, '247R7', 2500, '2025-01-01', 3000, 'Active in Program', 1, 'PhD', '2025-01-05', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PA257R3', 'NAZ ANUM', 1, '2508F', 2500, '2025-01-01', 3000, 'Active in Program', 1, 'PhD', '2025-01-04', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PA237R1', 'NUR SYAZA BINTI ZAKARIA', 1, '243YN', 2500, '2025-01-01', 3000, 'Active in Program', 1, 'PhD', '2025-02-07', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PK242QD', 'YANG XIAO', 1, '251D4', 2500, '2025-01-01', 3000, 'Active in Program', 4, 'PhD', '2025-03-22', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PK232QD', 'MD MUSLIM UDDIN AHMED PIPUL', 1, '2458H', 2500, '2025-01-01', 3000, 'Active in Program', 4, 'PhD', '2025-03-08', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PK222QD', 'JOANNA A/P JAYAPRAKASH', 1, '252QD', 2500, '2025-01-01', 3000, 'Active in Program', 4, 'PhD', '2025-02-16', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PK212QD', 'HAMZA BASHER ALAMIN BARKA', 1, '243YN', 2500, '2025-01-01', 3000, 'Active in Program', 4, 'PhD', '2025-01-05', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PK272QD', 'NAHIDA FERDOUS', 1, '247R7', 2500, '2025-01-01', 3000, 'Active in Program', 4, 'PhD', '2025-02-07', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PK251QD', 'NAHIDA ANUM', 1, '2458H', 2500, '2025-01-01', 3000, 'Active in Program', 4, 'PhD', '2025-01-08', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PB252PD', 'KHAN FERDOUS', 2, '245YK', 2500, '2025-01-01', 3000, 'Active in Program', 2, 'PhD', '2025-01-28', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PB244PD', 'PUARA A/P LACHMANAN', 2, '245ZK', 2500, '2025-01-01', 3000, 'Active in Program', 2, 'PhD', '2025-02-05', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PB258PD', 'YONG YU KIN', 2, '245RK', 2500, '2025-01-01', 3000, 'Active in Program', 2, 'PhD', '2025-02-08', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PB259PD', 'WONG KIN HUAT', 2, '247R7', 2500, '2025-01-01', 3000, 'Active in Program', 2, 'PhD', '2025-03-24', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PB260PD', 'WONG KANG JUN', 2, '247R8', 2500, '2025-01-01', 3000, 'Active in Program', 2, 'PhD', '2025-03-24', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PA213RK', 'AHMAD FAISAL BIN YUSOF', 2, '247R9', 2500, '2025-01-01', 3000, 'Active in Program', 2, 'PhD', '2025-01-05', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PK245T1', 'HANG JIA YEE', 2, '243A9', 2500, '2025-01-01', 3000, 'Active in Program', 3, 'Master', '2025-01-06', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PH272RM', 'LEE KOK MING', 2, '248RK', 2500, '2025-01-01', 3000, 'Active in Program', 3, 'Master', '2025-01-28', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PN281Q2', 'SITI NUR AIN BINTI RAHMAN', 2, '249YH', 2500, '2025-01-01', 3000, 'Active in Program', 3, 'Master', '2025-01-29', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PM269QD', 'RAHUL KUMAR SINGH', 2, '2468Z', 2500, '2025-01-01', 3000, 'Active in Program', 3, 'Master', '2025-02-22', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PJ258RD', 'CHAN WEI HONG', 2, '247JK', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-02-23', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PL293T1', 'NURUL HUDA BINTI AZIZ', 2, '245PL', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-02-01', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PR241PD', 'MOHAMMAD ALI KHAN', 2, '244XM', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-02-02', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PB237QK', 'TAN JIA WEI', 2, '2495N', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-02-03', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PC276R2', 'FARHAN BIN ISMAIL', 2, '246ZP', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-01-14', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PE261RJ', 'LIM PEI YEE', 2, '247QR', 2500, '2025-01-01', 3000, 'Active in Program', 3, 'Master', '2025-01-15', 'Full-time', FALSE, FALSE, 0, FALSE),
+('250PG248PD', 'RAJESH PRASAD', 2, '248R7', 2500, '2025-01-01', 3000, 'Active in Program', 3, 'Master', '2025-01-16', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PH234RM', 'GOH MUN KIT', 2, '2458T', 2500, '2025-01-01', 3000, 'Active in Program', 3, 'Master', '2025-01-04', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PJ285Q1', 'AISHA BINTI HASSAN', 2, '2465K', 2500, '2025-01-01', 3000, 'Active in Program', 3, 'Master', '2025-02-21', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PK292RD', 'ONG JUN HAO', 2, '247ZK', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-02-22', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PL239R2', 'PRIYA DEVI NAIR', 2, '249PK', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-01-07', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PN278QD', 'CHONG KAI LUN', 2, '243YK', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-01-21', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PR284PK', 'ABDUL RAHMAN BIN OTHMAN', 2, '245MK', 2500, '2025-01-01', 3000, 'Active in Program', 6, 'Master', '2025-01-22', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PS295RM', 'YAP SIEW LING', 1, '248RM', 2500, '2025-01-01', 3000, 'Active in Program', 5, 'Master', '2025-01-07', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PT244R3', 'MIRA SHARMINA BINTI HAMZAH', 1, '249RK', 2500, '2025-01-01', 3000, 'Active in Program', 5, 'Master', '2025-01-08', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PS297RL', 'KOH CHEE MING', 1, '247LH', 2500, '2025-01-01', 3000, 'Active in Program', 5, 'Master', '2025-01-25', 'Part-time', FALSE, FALSE, 0, FALSE),
+('250PS298RL', 'ANG ANSON', 1, '247LH', 2500, '2025-01-01', 3000, 'Active in Program', 5, 'Master', '2025-01-25', 'Full-time', FALSE, FALSE, 0, FALSE);
+
+-- Student Milestones
+-- milestone_id: 1=RPD, 3=Publication, 4=Thesis Seminar
+-- earliest_start_date used only for Thesis Seminar (milestone_id=4)
+INSERT INTO student_milestone
+    (student_id, milestone_id, earliest_start_date, expected_date, actual_date, status)
+VALUES
+(1, 1, NULL, '2026-01-22', '2025-07-03', 'Completed'),
+(1, 3, NULL, '2027-01-21', '2025-01-25', 'Completed'),
+(1, 4, '2029-01-01', '2030-01-01', '2029-05-01', 'Completed'),
+(2, 1, NULL, '2026-01-23', '2025-08-03', 'Completed'),
+(2, 3, NULL, '2027-02-21', '2026-08-03', 'Completed'),
+(2, 4, '2029-01-01', '2030-01-01', '2029-04-20', 'Completed'),
+(3, 1, NULL, '2026-02-09', '2025-08-04', 'Completed'),
+(3, 3, NULL, '2027-02-08', '2026-07-03', 'Completed'),
+(3, 4, '2029-01-01', '2030-01-01', '2029-05-24', 'Completed'),
+(4, 1, NULL, '2026-01-06', '2025-08-06', 'Completed'),
+(4, 3, NULL, '2027-01-05', '2026-08-05', 'Completed'),
+(4, 4, '2029-01-01', '2030-01-01', '2029-08-10', 'Completed'),
+(5, 1, NULL, '2026-01-06', '2025-08-06', 'Completed'),
+(5, 3, NULL, '2027-01-05', '2026-08-06', 'Completed'),
+(5, 4, '2029-01-01', '2030-01-01', '2029-08-16', 'Completed'),
+(6, 1, NULL, '2026-01-05', '2025-08-07', 'Completed'),
+(6, 3, NULL, '2027-01-04', '2026-08-07', 'Completed'),
+(6, 4, '2029-01-01', '2030-01-01', '2029-08-12', 'Completed'),
+(7, 1, NULL, '2026-02-08', '2026-08-08', 'Completed'),
+(7, 3, NULL, '2027-02-07', '2027-08-08', 'Completed'),
+(7, 4, '2029-01-01', '2030-01-01', '2030-01-13', 'Completed'),
+(8, 1, NULL, '2026-03-23', '2026-04-09', 'Completed'),
+(8, 3, NULL, '2027-03-22', '2027-08-09', 'Completed'),
+(8, 4, '2029-01-01', '2030-01-01', '2030-01-14', 'Completed'),
+(9, 1, NULL, '2026-03-09', '2026-08-10', 'Completed'),
+(9, 3, NULL, '2027-03-08', '2027-08-10', 'Completed'),
+(9, 4, '2029-01-01', '2030-01-01', '2030-01-15', 'Completed'),
+(10, 1, NULL, '2026-02-17', '2026-08-11', 'Completed'),
+(10, 3, NULL, '2027-02-16', '2027-08-11', 'Completed'),
+(10, 4, '2029-01-01', '2030-01-01', '2030-01-16', 'Completed'),
+(11, 1, NULL, '2026-01-06', '2025-05-18', 'Completed'),
+(11, 3, NULL, '2027-01-05', '2025-04-12', 'Completed'),
+(11, 4, '2031-01-01', '2032-01-01', '2029-04-17', 'Completed'),
+(12, 1, NULL, '2026-02-08', '2025-04-18', 'Completed'),
+(12, 3, NULL, '2027-02-07', '2026-04-13', 'Completed'),
+(12, 4, '2031-01-01', '2032-01-01', '2029-04-18', 'Completed'),
+(13, 1, NULL, '2026-01-08', '2025-05-15', 'Completed'),
+(13, 3, NULL, '2027-01-08', '2025-04-14', 'Completed'),
+(13, 4, '2031-01-01', '2032-01-01', '2029-03-19', 'Completed'),
+(14, 1, NULL, '2026-01-29', '2025-08-15', 'Completed'),
+(14, 3, NULL, '2027-01-28', '2026-08-15', 'Completed'),
+(14, 4, '2031-01-01', '2032-01-01', '2031-08-21', 'Completed'),
+(15, 1, NULL, '2026-02-06', '2025-08-16', 'Completed'),
+(15, 3, NULL, '2027-02-05', '2026-08-16', 'Completed'),
+(15, 4, '2031-01-01', '2032-01-01', '2031-08-21', 'Completed'),
+(16, 1, NULL, '2026-02-09', '2025-08-17', 'Completed'),
+(16, 3, NULL, '2027-02-08', '2026-08-17', 'Completed'),
+(16, 4, '2031-01-01', '2032-01-01', '2031-08-21', 'Completed'),
+(17, 1, NULL, '2026-03-25', '2026-03-22', 'Completed'),
+(17, 3, NULL, '2027-03-24', '2027-08-18', 'Completed'),
+(17, 4, '2031-01-01', '2032-01-01', '2032-01-23', 'Completed'),
+(18, 1, NULL, '2026-03-26', '2026-03-23', 'Completed'),
+(18, 3, NULL, '2027-03-24', '2027-08-19', 'Completed'),
+(18, 4, '2031-01-01', '2032-01-01', '2032-01-24', 'Completed'),
+(19, 1, NULL, '2026-01-06', '2026-04-24', 'Completed'),
+(19, 3, NULL, '2027-01-05', '2027-08-20', 'Completed'),
+(19, 4, '2031-01-01', '2032-01-01', '2032-01-25', 'Completed'),
+(20, 1, NULL, '2026-01-07', '2025-04-21', 'Completed'),
+(20, 3, NULL, '2026-04-06', '2025-06-20', 'Completed'),
+(20, 4, '2027-01-01', '2028-01-01', '2027-05-01', 'Completed'),
+(21, 1, NULL, '2026-01-29', '2025-05-21', 'Completed'),
+(21, 3, NULL, '2026-04-28', '2025-05-21', 'Completed'),
+(21, 4, '2027-01-01', '2028-01-01', '2027-05-25', 'Completed'),
+(22, 1, NULL, '2026-01-30', '2025-05-21', 'Completed'),
+(22, 3, NULL, '2026-04-29', '2025-06-22', 'Completed'),
+(22, 4, '2027-01-01', '2028-01-01', '2027-06-01', 'Completed'),
+(23, 1, NULL, '2026-02-23', '2025-09-21', 'Completed'),
+(23, 3, NULL, '2026-05-22', '2025-09-22', 'Completed'),
+(23, 4, '2027-01-01', '2028-01-01', '2027-09-01', 'Completed'),
+(24, 1, NULL, '2026-02-24', '2025-08-21', 'Completed'),
+(24, 3, NULL, '2026-05-23', '2025-10-01', 'Completed'),
+(24, 4, '2027-01-01', '2028-01-01', '2027-10-01', 'Completed'),
+(25, 1, NULL, '2026-02-02', '2025-09-27', 'Completed'),
+(25, 3, NULL, '2026-05-01', '2025-10-22', 'Completed'),
+(25, 4, '2027-01-01', '2028-01-01', '2027-11-01', 'Completed'),
+(26, 1, NULL, '2026-02-03', '2026-02-06', 'Completed'),
+(26, 3, NULL, '2026-05-02', '2026-05-12', 'Completed'),
+(26, 4, '2027-01-01', '2028-01-01', '2028-01-03', 'Completed'),
+(27, 1, NULL, '2026-02-04', '2026-02-07', 'Completed'),
+(27, 3, NULL, '2026-05-03', '2026-05-13', 'Completed'),
+(27, 4, '2027-01-01', '2028-01-01', '2028-01-08', 'Completed'),
+(28, 1, NULL, '2026-01-15', '2026-02-08', 'Completed'),
+(28, 3, NULL, '2026-04-14', '2026-04-23', 'Completed'),
+(28, 4, '2027-01-01', '2028-01-01', '2028-01-12', 'Completed'),
+(29, 1, NULL, '2026-01-16', '2026-02-06', 'Completed'),
+(29, 3, NULL, '2026-04-15', '2026-05-15', 'Completed'),
+(29, 4, '2027-01-01', '2028-01-01', '2028-01-18', 'Completed'),
+(30, 1, NULL, '2026-01-17', '2025-04-06', 'Completed'),
+(30, 3, NULL, '2026-04-16', '2025-06-20', 'Completed'),
+(30, 4, '2029-01-01', '2030-01-01', '2029-05-18', 'Completed'),
+(31, 1, NULL, '2026-01-05', '2025-04-21', 'Completed'),
+(31, 3, NULL, '2026-04-04', '2025-05-21', 'Completed'),
+(31, 4, '2029-01-01', '2030-01-01', '2029-06-18', 'Completed'),
+(32, 1, NULL, '2026-02-22', '2025-03-31', 'Completed'),
+(32, 3, NULL, '2026-05-21', '2025-06-22', 'Completed'),
+(32, 4, '2029-01-01', '2030-01-01', '2029-04-18', 'Completed'),
+(33, 1, NULL, '2026-02-23', '2025-09-30', 'Completed'),
+(33, 3, NULL, '2026-05-22', '2025-09-22', 'Completed'),
+(33, 4, '2029-01-01', '2030-01-01', '2029-08-18', 'Completed'),
+(34, 1, NULL, '2026-01-08', '2025-10-01', 'Completed'),
+(34, 3, NULL, '2026-04-07', '2025-10-01', 'Completed'),
+(34, 4, '2029-01-01', '2030-01-01', '2029-08-09', 'Completed'),
+(35, 1, NULL, '2026-02-22', '2025-10-02', 'Completed'),
+(35, 3, NULL, '2026-04-21', '2025-10-22', 'Completed'),
+(35, 4, '2029-01-01', '2030-01-01', '2029-09-18', 'Completed'),
+(36, 1, NULL, '2026-02-23', '2026-01-03', 'Completed'),
+(36, 3, NULL, '2026-04-22', '2026-05-12', 'Completed'),
+(36, 4, '2029-01-01', '2030-01-01', '2030-01-18', 'Completed'),
+(37, 1, NULL, '2026-01-08', '2026-01-01', 'Completed'),
+(37, 3, NULL, '2026-04-07', '2026-05-13', 'Completed'),
+(37, 4, '2029-01-01', '2030-01-01', '2030-01-19', 'Completed'),
+(38, 1, NULL, '2026-01-09', '2026-01-15', 'Completed'),
+(38, 3, NULL, '2026-04-08', '2026-04-23', 'Completed'),
+(38, 4, '2029-01-01', '2030-01-01', '2030-01-20', 'Completed'),
+(39, 1, NULL, '2026-01-26', '2026-02-03', 'Completed'),
+(39, 3, NULL, '2026-04-25', '2026-05-15', 'Completed'),
+(39, 4, '2029-01-01', '2030-01-01', '2030-01-21', 'Completed'),
+(40, 1, NULL, '2026-01-25', NULL, 'Overdue'),
+(40, 3, NULL, '2026-04-25', NULL, 'Overdue'),
+(40, 4, '2027-01-01', '2028-01-01', NULL, 'Pending');
 
 -- Student-Supervisor assignments
 INSERT INTO student_supervisor (student_id, supervisor_id, role, assigned_date) VALUES
-(1, 2, 'Main', '2022-03-01'), (1, 3, 'Co', '2022-03-01'),
-(2, 3, 'Main', '2022-03-01'),
-(3, 2, 'Main', '2022-09-01'),
-(4, 2, 'Main', '2023-03-01'), (4, 3, 'Co', '2023-03-01'),
-(5, 4, 'Main', '2023-03-01'),
-(6, 3, 'Main', '2023-09-01'),
-(7, 2, 'Main', '2024-03-01'),
-(8, 3, 'Main', '2024-03-01');
+(1, 2, 'Main', '2025-01-21'),
+(2, 2, 'Main', '2025-02-21'),
+(3, 2, 'Main', '2025-02-08'),
+(4, 2, 'Main', '2025-01-05'),
+(5, 2, 'Main', '2025-01-05'),
+(6, 2, 'Main', '2025-01-04'),
+(7, 2, 'Main', '2025-02-07'),
+(8, 4, 'Main', '2025-03-22'),
+(9, 4, 'Main', '2025-03-08'),
+(10, 4, 'Main', '2025-02-16'),
+(11, 4, 'Main', '2025-01-05'),
+(12, 4, 'Main', '2025-02-07'),
+(13, 4, 'Main', '2025-01-08'),
+(14, 3, 'Main', '2025-01-28'),
+(15, 3, 'Main', '2025-02-05'),
+(16, 3, 'Main', '2025-02-08'),
+(17, 3, 'Main', '2025-03-24'),
+(18, 3, 'Main', '2025-03-24'),
+(19, 3, 'Main', '2025-01-05'),
+(20, 3, 'Main', '2025-01-06'),
+(21, 3, 'Main', '2025-01-28'),
+(22, 3, 'Main', '2025-01-29'),
+(23, 3, 'Main', '2025-02-22'),
+(24, 5, 'Main', '2025-02-23'),
+(25, 5, 'Main', '2025-02-01'),
+(26, 5, 'Main', '2025-02-02'),
+(27, 5, 'Main', '2025-02-03'),
+(28, 5, 'Main', '2025-01-14'),
+(29, 3, 'Main', '2025-01-15'),
+(30, 3, 'Main', '2025-01-16'),
+(31, 3, 'Main', '2025-01-04'),
+(32, 3, 'Main', '2025-02-21'),
+(33, 5, 'Main', '2025-02-22'),
+(34, 5, 'Main', '2025-01-07'),
+(35, 5, 'Main', '2025-01-21'),
+(36, 5, 'Main', '2025-01-22'),
+(37, 4, 'Main', '2025-01-07'),
+(38, 4, 'Main', '2025-01-08'),
+(39, 4, 'Main', '2025-01-25'),
+(40, 4, 'Main', '2025-01-25');
 
--- Student Milestones (with realistic dates - some approaching, some overdue)
-INSERT INTO student_milestone (student_id, milestone_id, expected_date, actual_date, status) VALUES
--- Ali (PhD, enrolled 2022-03) - progressing but delayed on publication
-(1, 1, '2022-12-01', '2023-01-15', 'Completed'),
-(1, 3, '2024-03-01', NULL, 'Overdue'),
-(1, 4, '2024-09-01', NULL, 'Pending'),
-(1, 5, '2025-06-01', NULL, 'Pending'),
-
--- Wei Lin (PhD, enrolled 2022-03) - on track
-(2, 1, '2022-12-01', '2022-11-20', 'Completed'),
-(2, 3, '2024-03-01', '2024-02-15', 'Completed'),
-(2, 4, '2024-09-01', NULL, 'Pending'),
-(2, 5, '2025-06-01', NULL, 'Pending'),
-
--- Priya (Master PT, enrolled 2022-09) - almost done
-(3, 1, '2023-06-01', '2023-05-20', 'Completed'),
-(3, 3, '2024-03-01', '2024-04-10', 'Completed'),
-(3, 4, '2024-06-01', '2024-07-05', 'Completed'),
-(3, 5, '2025-01-01', NULL, 'Overdue'),
-
--- John (PhD, enrolled 2023-03) - RPD coming up soon!
-(4, 1, '2026-04-25', NULL, 'Pending'),
-(4, 3, '2025-03-01', NULL, 'Pending'),
-
--- Siti (PhD, enrolled 2023-03)
-(5, 1, '2023-12-01', '2024-02-10', 'Completed'),
-(5, 3, '2026-04-20', NULL, 'Pending'),
-
--- Rajesh (PhD PT, enrolled 2023-09) - at risk
-(6, 1, '2024-09-01', NULL, 'Overdue'),
-
--- Amy (Master FT, enrolled 2024-03)
-(7, 1, '2024-09-01', '2024-08-28', 'Completed'),
-(7, 3, '2026-06-01', NULL, 'Pending'),
-(7, 4, '2026-05-01', NULL, 'Pending'),
-
--- Mohammed (PhD, enrolled 2024-03)
-(8, 1, '2026-05-01', NULL, 'Pending');
-
--- PPM Records
+-- PPM Records (2025 H2 sample)
 INSERT INTO ppm_record (student_id, ppm_year, ppm_cycle, result, verify_status, verified_by_id, verified_by_name) VALUES
-(1, 2022, 2, 'S', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
-(1, 2023, 1, 'S', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
-(1, 2023, 2, 'US', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
-(1, 2024, 1, 'US', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
-(2, 2022, 2, 'S', 'Y', 'MU092301', 'Dr. Sarah Chen'),
-(2, 2023, 1, 'S', 'Y', 'MU092301', 'Dr. Sarah Chen'),
-(2, 2023, 2, 'S', 'Y', 'MU092301', 'Dr. Sarah Chen'),
-(2, 2024, 1, 'S', 'Y', 'MU092301', 'Dr. Sarah Chen'),
-(4, 2023, 2, 'S', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
-(4, 2024, 1, 'US', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
-(6, 2024, 1, 'US', 'Y', 'MU092301', 'Dr. Sarah Chen'),
-(6, 2024, 2, 'US', 'Y', 'MU092301', 'Dr. Sarah Chen');
+(1, 2025, 2, 'S', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
+(2, 2025, 2, 'S', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
+(3, 2025, 2, 'US', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
+(4, 2025, 2, 'S', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
+(5, 2025, 2, 'US', 'Y', 'MU081217', 'Dr. Ahmad Rahman'),
+(6, 2025, 2, 'S', 'Y', 'MU103456', 'Prof. James Wilson'),
+(7, 2025, 2, 'S', 'Y', 'MU103456', 'Prof. James Wilson');
 
--- Graduation Outcomes
+-- Graduation Outcomes (all 40 students)
 INSERT INTO graduation_outcome (student_id, expected_end_date, actual_end_date, is_delayed, final_status) VALUES
-(1, '2025-09-01', NULL, FALSE, 'Ongoing'),
-(2, '2025-09-01', NULL, FALSE, 'Ongoing'),
-(3, '2025-03-01', NULL, FALSE, 'Ongoing'),
-(4, '2026-09-01', NULL, FALSE, 'Ongoing'),
-(5, '2026-09-01', NULL, FALSE, 'Ongoing'),
-(6, '2027-03-01', NULL, FALSE, 'Ongoing'),
-(7, '2026-03-01', NULL, FALSE, 'Ongoing'),
-(8, '2027-09-01', NULL, FALSE, 'Ongoing');
+(1, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(2, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(3, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(4, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(5, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(6, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(7, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(8, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(9, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(10, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(11, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(12, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(13, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(14, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(15, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(16, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(17, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(18, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(19, '2032-01-01', NULL, FALSE, 'Ongoing'),
+(20, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(21, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(22, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(23, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(24, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(25, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(26, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(27, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(28, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(29, '2028-01-01', NULL, FALSE, 'Ongoing'),
+(30, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(31, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(32, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(33, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(34, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(35, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(36, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(37, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(38, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(39, '2030-01-01', NULL, FALSE, 'Ongoing'),
+(40, '2028-01-01', NULL, FALSE, 'Ongoing');
 
 -- Examiners
 INSERT INTO examiner (examiner_name, institution, is_external) VALUES
 ('Prof. Tan Ah Kow', 'University of Malaya', TRUE),
 ('Dr. Lee Wei Ming', 'NUS', TRUE),
 ('Prof. Yamamoto', 'University of Tokyo', TRUE);
+

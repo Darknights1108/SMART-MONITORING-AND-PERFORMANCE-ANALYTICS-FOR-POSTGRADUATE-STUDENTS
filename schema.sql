@@ -62,16 +62,28 @@ CREATE TABLE campus (
 CREATE TABLE student (
     student_id          INT PRIMARY KEY AUTO_INCREMENT,
     student_id_number   VARCHAR(50) NOT NULL UNIQUE,
-    -- University student ID, e.g., "PGS2024001"
+    -- University student ID, e.g., "250PA247R8"
     student_name        VARCHAR(200) NOT NULL,
-    email               VARCHAR(200) NOT NULL,
+    email               VARCHAR(200) NULL,
     campus_id           INT NOT NULL,
 
+    -- Term / intake info (from university system)
+    campus_code         VARCHAR(20) NULL,
+    -- e.g., "247R1" — the specific block/room code from CAMPUS_ID column
+    admit_term          INT NULL,
+    -- Intake term code, e.g., 2500 = Jan 2025 intake
+    admit_term_begin_date DATE NULL,
+    -- First day of the intake term, e.g., 2025-01-01
+    expected_grad_term  INT NULL,
+    -- Expected graduation term code, e.g., 3000 = 2030
+    program_status      VARCHAR(50) NULL DEFAULT 'Active in Program',
+    -- e.g., "Active in Program", "Completed", "Withdrawn"
+
     -- Demographic
-    gender              ENUM('Male', 'Female', 'Other') NOT NULL,
-    date_of_birth       DATE NOT NULL,
-    country_id          INT NOT NULL,
-    marital_status      ENUM('Single', 'Married', 'Divorced', 'Widowed') NOT NULL,
+    gender              ENUM('Male', 'Female', 'Other') NULL,
+    date_of_birth       DATE NULL,
+    country_id          INT NULL,
+    marital_status      ENUM('Single', 'Married', 'Divorced', 'Widowed') NULL,
     num_children        INT NOT NULL DEFAULT 0,
     youngest_child_age  DECIMAL(3,1) NULL,
     -- NULL if num_children = 0
@@ -79,26 +91,28 @@ CREATE TABLE student (
     -- Academic Background
     program_id          INT NOT NULL,
     degree_type         ENUM('Master', 'PhD') NOT NULL,
-    discipline_id       INT NOT NULL,
+    discipline_id       INT NULL,
     enrollment_date     DATE NOT NULL,
     entry_gpa           DECIMAL(4,2) NULL,
     -- GPA scale varies by country, standardize during preprocessing
     is_cross_discipline BOOLEAN NOT NULL DEFAULT FALSE,
-    study_method     ENUM('Full-time', 'Part-time') NOT NULL,
+    study_method        ENUM('Full-time', 'Part-time') NOT NULL,
 
     -- Financial
-    funding_id          INT NOT NULL,
+    funding_id          INT NULL,
     has_external_work   BOOLEAN NOT NULL DEFAULT FALSE,
     weekly_work_hours   DECIMAL(4,1) NOT NULL DEFAULT 0,
 
     -- Social Support
     in_research_group   BOOLEAN NOT NULL DEFAULT FALSE,
-    family_support      TINYINT NOT NULL CHECK (family_support BETWEEN 1 AND 5),
+    family_support      TINYINT NULL CHECK (family_support BETWEEN 1 AND 5),
     -- Likert scale: 1=Very Low, 2=Low, 3=Moderate, 4=High, 5=Very High
 
-    -- Computed (for clustering)
+    -- Computed (for clustering) — only when date_of_birth is available
     age_at_enrollment   INT GENERATED ALWAYS AS (
-        TIMESTAMPDIFF(YEAR, date_of_birth, enrollment_date)
+        CASE WHEN date_of_birth IS NOT NULL
+             THEN TIMESTAMPDIFF(YEAR, date_of_birth, enrollment_date)
+             ELSE NULL END
     ) STORED,
 
     FOREIGN KEY (campus_id)        REFERENCES campus(campus_id),
@@ -141,6 +155,8 @@ CREATE TABLE student_milestone (
     id                  INT PRIMARY KEY AUTO_INCREMENT,
     student_id          INT NOT NULL,
     milestone_id        INT NOT NULL,
+    earliest_start_date DATE NULL,
+    -- Earliest allowed start date (only used by Thesis Seminar milestone)
     expected_date       DATE NULL,
     actual_date         DATE NULL,
     status              ENUM('Pending', 'Completed', 'Overdue') NOT NULL DEFAULT 'Pending',
