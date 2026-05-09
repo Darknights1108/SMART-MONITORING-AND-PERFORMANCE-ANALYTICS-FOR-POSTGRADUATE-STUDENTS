@@ -3,16 +3,19 @@ FastAPI main application entry point.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+import os
 from apscheduler.schedulers.background import BackgroundScheduler
-from app.api import auth, chat, dashboard, predictions
-from app.services.scheduler_service import check_and_send_reminders
+from app.api import auth, chat, dashboard, predictions, students
+from app.api.analytics_api import router as analytics_router
+from app.services.scheduler_service import check_and_send_reminders, auto_retrain_on_drift
 from app.services.ml_service import train_and_predict
 from app.config import get_settings
 
 settings = get_settings()
 
 app = FastAPI(
-    title="DataTrain - Postgraduate Student Management Agent",
+    title="Postgraduate Monitoring System",
     description="AI-powered system for monitoring graduate student progress and sending reminders",
     version="1.0.0",
 )
@@ -37,6 +40,8 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(dashboard.router)
 app.include_router(predictions.router)
+app.include_router(students.router)
+app.include_router(analytics_router)
 
 # Scheduler for automatic reminders
 scheduler = BackgroundScheduler()
@@ -63,6 +68,15 @@ def startup_event():
         id="daily_ml_retrain",
         replace_existing=True,
     )
+    # Mid-day drift check — triggers a second retrain if drift was found >4 h ago
+    scheduler.add_job(
+        auto_retrain_on_drift,
+        "cron",
+        hour=14,
+        minute=5,
+        id="midday_drift_check",
+        replace_existing=True,
+    )
     scheduler.start()
     print(f"[STARTUP] Scheduler started - daily check at {settings.REMINDER_CHECK_HOUR}:{settings.REMINDER_CHECK_MINUTE:02d}")
 
@@ -87,8 +101,16 @@ def health_check():
 
 
 @app.post("/api/test-email")
-async def test_email(to: str, subject: str = "Test Email", body: str = "Hello from DataTrain!"):
+async def test_email(to: str, subject: str = "Test Email", body: str = "Hello from Postgraduate Monitoring System!"):
     """Quick email test endpoint - sends directly to any address via Mailpit."""
     from app.services.email_service import send_email
     success = await send_email(to, subject, body)
     return {"success": success, "to": to, "subject": subject}
+
+
+@app.get("/benchmark", response_class=HTMLResponse)
+def benchmark_page():
+    """Serve the standalone Model Benchmark dashboard page."""
+    html_path = os.path.join(os.path.dirname(__file__), "..", "benchmark.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        return f.read()
