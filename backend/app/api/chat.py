@@ -12,6 +12,7 @@ from app.tools.email_tools import (
     has_pending_sends, execute_pending_sends, clear_pending_sends,
     stage_email_draft, get_pending_display,
 )
+from app.services.connection_manager import manager
 import uuid
 import json
 import re
@@ -102,6 +103,7 @@ async def chat_websocket(websocket: WebSocket):
                 "role": user["role"],
             }
         })
+        manager.register(supervisor_id, websocket)
     except Exception as e:
         await websocket.send_json({"type": "error", "message": str(e)})
         await websocket.close()
@@ -196,12 +198,18 @@ async def chat_websocket(websocket: WebSocket):
                             })
                     if step_log.observations:
                         obs = str(step_log.observations)
-                        # Forward chart actions immediately as a real message
+                        # Forward chart/nav actions immediately as a real message
                         try:
                             obs_parsed = json.loads(obs)
                             if isinstance(obs_parsed, dict) and obs_parsed.get("__chart_action__"):
                                 loop.call_soon_threadsafe(step_queue.put_nowait, {
                                     "type": "chart_action",
+                                    "message": obs,
+                                })
+                                return
+                            if isinstance(obs_parsed, dict) and obs_parsed.get("__nav_action__"):
+                                loop.call_soon_threadsafe(step_queue.put_nowait, {
+                                    "type": "nav_action",
                                     "message": obs,
                                 })
                                 return
@@ -253,12 +261,14 @@ async def chat_websocket(websocket: WebSocket):
                 elif _try_stage_text_draft(user_message, response_str):
                     response_str = get_pending_display()
 
-                # Detect chart action payload from render_chart tool
+                # Detect chart / nav action payloads
                 msg_type = "message"
                 try:
                     parsed = json.loads(response_str)
                     if isinstance(parsed, dict) and parsed.get("__chart_action__"):
                         msg_type = "chart_action"
+                    elif isinstance(parsed, dict) and parsed.get("__nav_action__"):
+                        msg_type = "nav_action"
                 except (json.JSONDecodeError, TypeError):
                     pass
 
@@ -288,4 +298,5 @@ async def chat_websocket(websocket: WebSocket):
     except Exception as e:
         print(f"[CHAT ERROR] {e}")
     finally:
+        manager.unregister(supervisor_id, websocket)
         db.close()

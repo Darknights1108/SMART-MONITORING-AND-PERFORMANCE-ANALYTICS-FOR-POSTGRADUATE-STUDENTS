@@ -262,6 +262,31 @@ export default function ChatWidget() {
       if (data.type === 'thinking')     { setThinking(true);  return }
       if (['agent_thinking', 'tool_call', 'tool_result'].includes(data.type)) return
 
+      if (data.type === 'push_alert') {
+        const alerts = data.alerts as Array<{level: string; message: string; student_name?: string}>
+        if (alerts.length > 0) {
+          const summary = '🔔 **System Alert**\n' + alerts.map(a =>
+            `${a.level === 'high' ? '🔴' : a.level === 'warning' ? '🟡' : 'ℹ️'} ${a.message}`
+          ).join('\n')
+          setMessages(prev => [...prev, { id: idRef.current++, role: 'system', content: summary }])
+          setUnread(n => n + 1)
+        }
+        return
+      }
+
+      if (data.type === 'nav_action') {
+        setThinking(false)
+        try {
+          const payload = JSON.parse(data.message)
+          setMessages(prev => [...prev, {
+            id: idRef.current++, role: 'assistant',
+            content: `Navigating to ${payload.page}...`
+          }])
+          setTimeout(() => { window.location.href = payload.url }, 800)
+        } catch {}
+        return
+      }
+
       if (data.type === 'chart_action') {
         setThinking(false)
         try {

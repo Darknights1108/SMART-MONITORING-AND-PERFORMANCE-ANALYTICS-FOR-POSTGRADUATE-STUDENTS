@@ -5,11 +5,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 import os
+import asyncio
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.api import auth, chat, dashboard, predictions, students
 from app.api.analytics_api import router as analytics_router
 from app.services.scheduler_service import check_and_send_reminders
 from app.services.ml_service import train_and_predict
+from app.services.alert_service import check_and_push_alerts
 from app.config import get_settings
 
 settings = get_settings()
@@ -67,6 +69,11 @@ def startup_event():
         minute=settings.REMINDER_CHECK_MINUTE + 5,
         id="daily_ml_retrain",
         replace_existing=True,
+    )
+    scheduler.add_job(
+        lambda: asyncio.run(check_and_push_alerts()),
+        "interval", minutes=30,
+        id="alert_check", replace_existing=True,
     )
     scheduler.start()
     print(f"[STARTUP] Scheduler started - daily check at {settings.REMINDER_CHECK_HOUR}:{settings.REMINDER_CHECK_MINUTE:02d}")
