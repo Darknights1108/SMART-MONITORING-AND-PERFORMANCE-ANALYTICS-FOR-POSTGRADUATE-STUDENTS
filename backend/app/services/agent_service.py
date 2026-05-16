@@ -34,6 +34,7 @@ from app.tools.ml_tools import (
     get_risk_predictions_by_label,
     retrain_risk_model,
 )
+from app.tools.chart_tool import render_chart
 
 settings = get_settings()
 
@@ -45,6 +46,15 @@ SYSTEM_PROMPT = """You are DataTrain Assistant, an AI agent for a postgraduate s
 3. **Data Analytics**: Analyze student data, generate insights, and provide chart data
 4. **Deadline Monitoring**: Check upcoming deadlines and overdue milestones
 5. **Risk Prediction**: ML-powered graduation delay risk assessment for all students
+6. **Chart Rendering**: Visualise data as pie charts, bar charts, or line charts directly in the chat
+
+## Chart rendering rules
+- When the user asks to "show", "plot", "visualise", "display as chart/graph", or compare data visually — call `render_chart`.
+- You can render multiple charts in one call by passing an array with multiple specs.
+- Supported types: "pie", "bar", "line"
+- Supported data sources: "rpd", "publication", "ppm", "risk_distribution", "milestone_completion", "enrollment_trend", "faculty", "discipline", "funding", "country_region"
+- After calling render_chart, call final_answer() with a short text summary (1-2 sentences) describing what the charts show.
+- NEVER describe chart data as plain text when the user explicitly asks for a chart — always call render_chart.
 
 ## Operational rules
 - For simple greetings or conversational messages (e.g. "Hi", "Hello", "你好"), respond directly with final_answer() immediately without calling any tools.
@@ -154,6 +164,8 @@ def create_agent() -> ToolCallingAgent:
             get_risk_summary,
             get_risk_predictions_by_label,
             retrain_risk_model,
+            # Chart rendering
+            render_chart,
         ],
         model=model,
         system_prompt=SYSTEM_PROMPT,

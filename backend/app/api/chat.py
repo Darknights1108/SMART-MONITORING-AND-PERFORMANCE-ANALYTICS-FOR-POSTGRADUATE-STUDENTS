@@ -196,6 +196,17 @@ async def chat_websocket(websocket: WebSocket):
                             })
                     if step_log.observations:
                         obs = str(step_log.observations)
+                        # Forward chart actions immediately as a real message
+                        try:
+                            obs_parsed = json.loads(obs)
+                            if isinstance(obs_parsed, dict) and obs_parsed.get("__chart_action__"):
+                                loop.call_soon_threadsafe(step_queue.put_nowait, {
+                                    "type": "chart_action",
+                                    "message": obs,
+                                })
+                                return
+                        except (json.JSONDecodeError, TypeError):
+                            pass
                         loop.call_soon_threadsafe(step_queue.put_nowait, {
                             "type": "tool_result",
                             "content": obs[:800] + ("…" if len(obs) > 800 else ""),
@@ -242,12 +253,12 @@ async def chat_websocket(websocket: WebSocket):
                 elif _try_stage_text_draft(user_message, response_str):
                     response_str = get_pending_display()
 
-                # Check if response contains chart data (JSON)
+                # Detect chart action payload from render_chart tool
                 msg_type = "message"
                 try:
                     parsed = json.loads(response_str)
-                    if isinstance(parsed, dict) and "type" in parsed:
-                        msg_type = "chart"
+                    if isinstance(parsed, dict) and parsed.get("__chart_action__"):
+                        msg_type = "chart_action"
                 except (json.JSONDecodeError, TypeError):
                     pass
 
