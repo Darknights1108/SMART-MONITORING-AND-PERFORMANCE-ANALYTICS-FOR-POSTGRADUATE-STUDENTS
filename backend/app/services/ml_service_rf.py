@@ -700,13 +700,115 @@ def _feature_importance(model: RandomForestClassifier, feature_names: list) -> d
     ))
 
 
+def evaluate_on_uci() -> dict:
+    """
+    Holdout evaluation of all three stage models on UCI dataset.
+
+    Workflow:
+      1. Stratified 80/20 train/test split (random_state=42, reproducible)
+      2. Train each stage model on the 80% train set
+      3. Evaluate on the 20% held-out test set → ground truth is known (Graduate/Dropout)
+      4. Return comprehensive metrics per stage
+
+    This produces concrete, publishable validation results for FYP reporting
+    without requiring future student outcome data.
+
+    Expected pattern: Stage 3 > Stage 2 > Stage 1 (more features = better prediction)
+    This demonstrates the value of the progressive staging approach.
+    """
+    from sklearn.metrics import confusion_matrix
+
+    ext = _load_external_data()
+    if ext is None:
+        return {"available": False, "reason": "data.csv not found"}
+
+    evaluation: dict = {"available": True, "stages": {}}
+
+    for stage, features, label in [
+        (1, STAGE1_FEATURES, "Stage 1 (Enrollment only)"),
+        (2, STAGE2_FEATURES, "Stage 2 (+ 1st-cycle progress)"),
+        (3, STAGE3_FEATURES, "Stage 3 (+ 2nd-cycle assessment)"),
+    ]:
+        X = ext[features].fillna(0).values
+        y = ext["is_delayed"].values
+
+        # Stratified 80/20 split — same seed guarantees reproducibility
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, stratify=y, random_state=42
+        )
+
+        model = RandomForestClassifier(**RF_PARAMS)
+        model.fit(X_train, y_train)
+
+        y_pred  = model.predict(X_test)
+        y_proba = model.predict_proba(X_test)[:, 1]
+
+        # Cross-val on train set (5-fold)
+        cv    = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        cv_acc = cross_val_score(model, X_train, y_train, cv=cv, scoring="accuracy")
+        cv_auc = cross_val_score(model, X_train, y_train, cv=cv, scoring="roc_auc")
+
+        cm = confusion_matrix(y_test, y_pred)
+        tn, fp, fn, tp = cm.ravel() if cm.shape == (2, 2) else (0, 0, 0, 0)
+
+        stage_result = {
+            "label":          label,
+            "n_train":        int(len(X_train)),
+            "n_test":         int(len(X_test)),
+            "n_features":     int(len(features)),
+            # Holdout test-set metrics (primary results)
+            "test_accuracy":  round(float(accuracy_score(y_test, y_pred)),                           4),
+            "test_auc_roc":   round(float(roc_auc_score(y_test, y_proba)),                          4),
+            "test_f1":        round(float(f1_score(y_test, y_pred, average="weighted")),             4),
+            "test_precision": round(float(precision_score(y_test, y_pred, average="weighted",
+                                                           zero_division=0)),                        4),
+            "test_recall":    round(float(recall_score(y_test, y_pred, average="weighted",
+                                                        zero_division=0)),                           4),
+            # Confusion matrix
+            "confusion_matrix": {"TP": int(tp), "TN": int(tn), "FP": int(fp), "FN": int(fn)},
+            # Cross-val on train set
+            "cv_accuracy_mean": round(float(cv_acc.mean()), 4),
+            "cv_accuracy_std":  round(float(cv_acc.std()),  4),
+            "cv_auc_mean":      round(float(cv_auc.mean()), 4),
+            "cv_auc_std":       round(float(cv_auc.std()),  4),
+            # Classification report
+            "classification_report": classification_report(y_test, y_pred,
+                                                           target_names=["Graduate", "Dropout"]),
+            # Feature importances (top 5)
+            "feature_importances": dict(sorted(
+                zip(features, model.feature_importances_),
+                key=lambda x: x[1], reverse=True
+            )[:5] if len(features) >= 5 else zip(features, model.feature_importances_)),
+        }
+        evaluation["stages"][stage] = stage_result
+        logger.info(
+            f"[RF:Eval] Stage {stage} holdout — "
+            f"Acc={stage_result['test_accuracy']:.4f}, "
+            f"AUC={stage_result['test_auc_roc']:.4f}, "
+            f"F1={stage_result['test_f1']:.4f}  "
+            f"(train={len(X_train)}, test={len(X_test)})"
+        )
+
+    # Cross-stage improvement summary
+    s = evaluation["stages"]
+    if 1 in s and 2 in s and 3 in s:
+        evaluation["improvement"] = {
+            "acc_s1_to_s2": round(s[2]["test_accuracy"] - s[1]["test_accuracy"], 4),
+            "acc_s2_to_s3": round(s[3]["test_accuracy"] - s[2]["test_accuracy"], 4),
+            "auc_s1_to_s2": round(s[2]["test_auc_roc"] - s[1]["test_auc_roc"],   4),
+            "auc_s2_to_s3": round(s[3]["test_auc_roc"] - s[2]["test_auc_roc"],   4),
+        }
+
+    return evaluation
+
+
 def pretrain_on_external_data() -> Optional[dict[int, tuple[RandomForestClassifier, dict]]]:
     """
-    Pre-train ALL THREE stage RF models on data.csv (UCI dataset).
+    Pre-train ALL THREE stage RF models on the FULL UCI dataset (no holdout).
+    These are the production models — trained on all available data for best coverage.
 
-    Stage 1: enrollment features only (Stage 1 features)
-    Stage 2: + 1st-semester proxy features (perf_rate_s1, perf_quality_s1, months_enrolled)
-    Stage 3: + 2nd-semester proxy features (perf_rate_s2, perf_quality_s2, perf_trend)
+    Holdout evaluation metrics are produced by evaluate_on_uci() separately,
+    which uses an 80/20 split on the same dataset.
 
     Returns dict {stage: (model, metrics)} or None if data not available.
     """
@@ -723,10 +825,12 @@ def pretrain_on_external_data() -> Optional[dict[int, tuple[RandomForestClassifi
         X = ext[features].fillna(0).values
         y = ext["is_delayed"].values
         model, metrics = _train_rf(X, y, tag)
-        metrics["source"] = f"data.csv (UCI) — Stage {stage}"
+        metrics["source"] = f"data.csv (UCI) — Stage {stage} (full training set)"
         results[stage] = (model, metrics)
-        logger.info(f"[RF] Stage {stage} pre-trained on UCI: acc={metrics['train_accuracy']}, "
-                    f"auc={metrics.get('train_auc', 'N/A')}, n={len(X)}")
+        logger.info(
+            f"[RF] Stage {stage} UCI full-data pre-training: "
+            f"acc={metrics['train_accuracy']}, auc={metrics.get('train_auc', 'N/A')}, n={len(X)}"
+        )
 
     return results
 
@@ -907,9 +1011,21 @@ def train_and_predict_rf() -> dict:
 
     all_metrics: dict = {}
 
-    # ── Pre-train ALL stages on UCI external data ─────────────────────────────
-    # All three RF models (Stage 1/2/3) are pre-trained on data.csv.
-    # Stage 2/3 use 1st/2nd-semester UCI columns as academic-progress proxies.
+    # ── UCI Holdout Evaluation (produces FYP validation results) ─────────────
+    # Run 80/20 stratified holdout BEFORE full training so results are unbiased.
+    # These metrics are the primary evidence for model validity.
+    eval_results = evaluate_on_uci()
+    if eval_results.get("available"):
+        all_metrics["uci_holdout_evaluation"] = eval_results
+        logger.info("[RF] UCI holdout evaluation complete.")
+        for stg, sr in eval_results.get("stages", {}).items():
+            logger.info(
+                f"  Stage {stg}: Acc={sr['test_accuracy']:.4f}, "
+                f"AUC={sr['test_auc_roc']:.4f}, F1={sr['test_f1']:.4f}"
+            )
+
+    # ── Pre-train ALL stages on FULL UCI data (production models) ────────────
+    # Trained on full dataset (no holdout) for best coverage in deployment.
     ext_results = pretrain_on_external_data()
     models: dict[int, RandomForestClassifier] = {}
     _STAGE_PATHS = {1: _RF_S1_PATH, 2: _RF_S2_PATH, 3: _RF_S3_PATH}

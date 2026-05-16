@@ -23,6 +23,7 @@ from app.services.ml_service import (
 from app.services.ml_service_rf import (
     train_and_predict_rf,
     get_stage_summary,
+    evaluate_on_uci,
 )
 from app.services.drift_service import (
     get_latest_drift_report,
@@ -239,25 +240,26 @@ def reset_drift_reference(current_user: dict = Depends(require_role(["Admin", "B
 @router.post("/retrain")
 def retrain(current_user: dict = Depends(require_role(["Admin", "Both"]))):
     """
-    Re-run the K-Means clustering pipeline.
-    Admin only — triggers on demand (e.g., after new PPM data is entered).
+    Re-run the multi-stage prediction pipeline (primary endpoint):
+      Stage 1 → Random Forest pre-trained on UCI data.csv (3630 students)
+      Stage 2 → Rule-based: PPM US count + RPD delay
+      Stage 3 → Rule-based: Stage 2 + examiner score + thesis seminar delay
+    Admin only.
     """
-    result = train_and_predict()
+    result = train_and_predict_rf()
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("reason"))
     return result
 
 
-@router.post("/retrain-rf")
-def retrain_rf(current_user: dict = Depends(require_role(["Admin", "Both"]))):
+@router.post("/retrain-kmeans")
+def retrain_kmeans(current_user: dict = Depends(require_role(["Admin", "Both"]))):
     """
-    Re-run the multi-stage Random Forest pipeline.
-    Stage 1: pre-trained on data.csv (3630 students), applied to all students.
-    Stage 2: adds RPD delay + PPM features (students with progress data).
-    Stage 3: adds examiner score + thesis features (students with reports).
+    Re-run the legacy K-Means clustering pipeline.
+    Kept for comparison / benchmarking purposes.
     Admin only.
     """
-    result = train_and_predict_rf()
+    result = train_and_predict()
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("reason"))
     return result
@@ -272,6 +274,27 @@ def prediction_stage_summary():
     Stage 3 = + examiner report.
     """
     return get_stage_summary()
+
+
+@router.get("/evaluation/uci")
+def uci_holdout_evaluation():
+    """
+    Run 80/20 stratified holdout evaluation of all three stage RF models on UCI data.
+
+    Each stage is trained on 80% of the UCI dataset (3630 students with known
+    Graduate/Dropout outcomes) and evaluated on the remaining 20% held-out set.
+    This produces ground-truth-validated metrics without requiring future student data.
+
+    Returns per-stage: Accuracy, AUC-ROC, F1, Precision, Recall, Confusion Matrix,
+    5-fold CV scores, feature importances, and cross-stage improvement deltas.
+    """
+    result = evaluate_on_uci()
+    if not result.get("available"):
+        raise HTTPException(
+            status_code=503,
+            detail=result.get("reason", "UCI data.csv not available in container.")
+        )
+    return result
 
 
 @router.get("/{student_id}")
