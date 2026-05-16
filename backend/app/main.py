@@ -8,7 +8,7 @@ import os
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.api import auth, chat, dashboard, predictions, students
 from app.api.analytics_api import router as analytics_router
-from app.services.scheduler_service import check_and_send_reminders, auto_retrain_on_drift
+from app.services.scheduler_service import check_and_send_reminders
 from app.services.ml_service import train_and_predict
 from app.config import get_settings
 
@@ -66,15 +66,6 @@ def startup_event():
         hour=settings.REMINDER_CHECK_HOUR,
         minute=settings.REMINDER_CHECK_MINUTE + 5,
         id="daily_ml_retrain",
-        replace_existing=True,
-    )
-    # Mid-day drift check — triggers a second retrain if drift was found >4 h ago
-    scheduler.add_job(
-        auto_retrain_on_drift,
-        "cron",
-        hour=14,
-        minute=5,
-        id="midday_drift_check",
         replace_existing=True,
     )
     scheduler.start()

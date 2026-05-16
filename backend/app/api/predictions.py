@@ -23,7 +23,7 @@ from app.services.ml_service import (
 from app.services.ml_service_rf import (
     train_and_predict_rf,
     get_stage_summary,
-    evaluate_on_uci,
+    evaluate_stage1_holdout,
 )
 from app.services.drift_service import (
     get_latest_drift_report,
@@ -279,16 +279,13 @@ def prediction_stage_summary():
 @router.get("/evaluation/uci")
 def uci_holdout_evaluation():
     """
-    Run 80/20 stratified holdout evaluation of all three stage RF models on UCI data.
+    Run 80/20 stratified holdout evaluation of Stage 1 RF model on UCI data.
 
-    Each stage is trained on 80% of the UCI dataset (3630 students with known
+    Stage 1 is trained on 80% of the UCI dataset (3630 students with known
     Graduate/Dropout outcomes) and evaluated on the remaining 20% held-out set.
-    This produces ground-truth-validated metrics without requiring future student data.
-
-    Returns per-stage: Accuracy, AUC-ROC, F1, Precision, Recall, Confusion Matrix,
-    5-fold CV scores, feature importances, and cross-stage improvement deltas.
+    Stage 2/3 use rule-based logic and do not require ML evaluation.
     """
-    result = evaluate_on_uci()
+    result = evaluate_stage1_holdout()
     if not result.get("available"):
         raise HTTPException(
             status_code=503,

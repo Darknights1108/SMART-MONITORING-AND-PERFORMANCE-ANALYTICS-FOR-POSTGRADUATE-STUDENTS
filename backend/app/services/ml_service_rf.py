@@ -24,8 +24,13 @@ from datetime import datetime
 from typing import Optional
 
 import joblib
-import mlflow
-import mlflow.sklearn
+try:
+    import mlflow
+    import mlflow.sklearn
+    _MLFLOW_AVAILABLE = True
+except ImportError:
+    mlflow = None
+    _MLFLOW_AVAILABLE = False
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -232,83 +237,97 @@ def evaluate_stage1_holdout() -> dict:
 #   University policy (3× US PPM = termination) is itself the ground truth.
 #   Simple threshold rules are transparent, explainable, and policy-aligned.
 #
-# Stage 2 rules (source: Malaysian public university postgrad regulations):
+# Stage 2 rules — PRE-DEADLINE early warning (fire BEFORE deadline is missed):
 #   HIGH   → 2+ Unsatisfactory PPM  (termination imminent)
-#             OR 1 US PPM + RPD overdue > 180 days  (compounding risk)
+#             OR 1 US PPM + RPD due within 30 days (compounding risk)
+#             OR RPD due within 30 days and not yet submitted
 #   MEDIUM → 1 Unsatisfactory PPM
-#             OR RPD overdue > 90 days
-#             OR Publication overdue > 90 days with no papers accepted
+#             OR RPD due within 31–60 days and not yet submitted
+#             OR Publication still short + pub deadline within 30 days
 #   LOW    → everything else
 #
-# Stage 3 rules (source: examiner report + thesis seminar milestone):
-#   HIGH   → examiner avg < 2.5  (below passing standard)
-#             OR thesis seminar overdue > 90 days
-#   MEDIUM → examiner avg < 3.5  (borderline)
-#             OR thesis seminar overdue > 30 days
+# Stage 3 rules — PRE-DEADLINE early warning, no Examiner score:
+#   HIGH   → Thesis seminar due within 30 days and not yet done
+#             OR Stage 2 = High (carry forward)
+#   MEDIUM → Thesis seminar due within 31–60 days and not yet done
+#             OR Stage 2 = Medium (carry forward)
+#   LOW    → everything else
+#
+# Convention for date fields (rpd_delay_days, pub_days_from_deadline, thesis_seminar_delay):
+#   negative = days until deadline (future)   e.g. -20 = due in 20 days
+#   positive = days past deadline (overdue)   e.g.  30 = 30 days overdue
+#   0        = no milestone / completed on time
 #   LOW    → examiner avg ≥ 3.5 and no significant delays
 
 def _detect_stage2(row: pd.Series) -> dict:
     """
-    Stage 2 rule-based detection.
-    Priority order: PPM > RPD > Publication.
+    Stage 2 pre-deadline early warning.
+    Priority: PPM (result) > RPD (deadline) > Publication (deadline).
+    Date fields: negative = days until deadline, positive = days overdue.
     """
     factors = []
 
-    us  = int(_s(row.get("ppm_us_count")))
-    rpd = _s(row.get("rpd_delay_days"))
+    us            = int(_s(row.get("ppm_us_count")))
+    rpd           = _s(row.get("rpd_delay_days"))
+    rpd_completed = bool(_s(row.get("rpd_completed")))
+    pub_accepted  = int(_s(row.get("pub_accepted_count")))
+    pub_required  = int(_s(row.get("pub_required"), default=1)) or 1
+    pub_days      = _s(row.get("pub_days_from_deadline"))   # negative = future
+    pub_deficit   = max(pub_required - pub_accepted, 0)
 
-    pub_accepted = int(_s(row.get("pub_accepted_count")))
-    pub_required = int(_s(row.get("pub_required"), default=1)) or 1
-    pub_overdue  = _s(row.get("pub_overdue_days"))
-    pub_deficit  = max(pub_required - pub_accepted, 0)
+    # ── Pre-deadline windows ──────────────────────────────────────────────────
+    rpd_due_within_30  = (not rpd_completed) and (-30 <= rpd < 0)
+    rpd_due_within_60  = (not rpd_completed) and (-60 <= rpd < -30)
+    pub_due_within_30  = pub_deficit > 0 and (-30 <= pub_days < 0)
+    pub_due_within_60  = pub_deficit > 0 and (-60 <= pub_days < -30)
 
-    # ── Determine label ───────────────────────────────────────────────────────
+    # ── Determine label (priority order) ─────────────────────────────────────
     if us >= 2:
         label = "High"
         factors.append(f"{us} Unsatisfactory PPM results (termination risk)")
-    elif us == 1 and rpd > 180:
+    elif us == 1 and rpd_due_within_30:
         label = "High"
-        factors.append("1 Unsatisfactory PPM + RPD overdue by "
-                        f"{int(rpd)} days (compounding risk)")
+        factors.append("1 Unsatisfactory PPM + RPD due in "
+                        f"{int(-rpd)} days (compounding risk)")
+    elif rpd_due_within_30:
+        label = "High"
+        factors.append(f"RPD due in {int(-rpd)} days — submission required urgently")
     elif us == 1:
         label = "Medium"
         factors.append("1 Unsatisfactory PPM result")
-    elif rpd > 90:
+    elif rpd_due_within_60:
         label = "Medium"
-        factors.append(f"RPD overdue by {int(rpd)} days")
-    elif pub_deficit > 0 and pub_overdue > 90:
+        factors.append(f"RPD due in {int(-rpd)} days — prepare submission")
+    elif pub_due_within_30:
         label = "Medium"
-        factors.append(
-            f"Publication overdue by {int(pub_overdue)} days "
-            f"({pub_accepted}/{pub_required} papers accepted)"
-        )
+        factors.append(f"Publication deadline in {int(-pub_days)} days "
+                       f"({pub_accepted}/{pub_required} accepted, {pub_deficit} short)")
     else:
         label = "Low"
 
     # ── Supplementary informational factors ──────────────────────────────────
-    if label != "High" and us == 0 and rpd > 0:
-        factors.append(f"RPD overdue by {int(rpd)} days")
-    if label != "High" and us == 0 and rpd <= 0:
-        rpd_completed = _s(row.get("rpd_completed"))
-        if rpd_completed and rpd < -7:
-            factors.append("RPD completed ahead of schedule")
-    if pub_deficit > 0 and pub_overdue > 0 and label == "Low":
-        factors.append(
-            f"Publication overdue by {int(pub_overdue)} days "
-            f"({pub_accepted}/{pub_required} papers accepted)"
-        )
-    elif pub_deficit > 0 and pub_overdue == 0:
-        sub = int(_s(row.get("pub_submitted_count")))
-        if sub > 0:
-            factors.append(f"Publication in progress "
-                           f"({sub} submitted, {pub_accepted}/{pub_required} accepted)")
-        else:
-            factors.append(f"No publications submitted yet "
-                           f"({pub_accepted}/{pub_required} required)")
-    elif pub_deficit == 0:
-        factors.append(f"Publication requirement met "
+    # RPD status (if not already the main label driver)
+    if rpd_completed and rpd < -7:
+        factors.append("RPD submitted ahead of schedule")
+    elif rpd_completed and rpd == 0:
+        factors.append("RPD submitted on time")
+    elif rpd_completed and rpd > 0:
+        factors.append(f"RPD submitted {int(rpd)} days late")
+    elif pub_due_within_60 and label == "Low":
+        factors.append(f"Publication deadline in {int(-pub_days)} days "
                        f"({pub_accepted}/{pub_required} accepted)")
 
+    # Publication progress
+    sub = int(_s(row.get("pub_submitted_count")))
+    if pub_deficit == 0:
+        factors.append(f"Publication requirement met ({pub_accepted}/{pub_required} accepted)")
+    elif sub > 0 and pub_deficit > 0:
+        factors.append(f"Publication in progress ({sub} submitted, "
+                       f"{pub_accepted}/{pub_required} accepted)")
+    elif pub_deficit > 0 and pub_days == 0:
+        factors.append(f"No publications yet ({pub_accepted}/{pub_required} required)")
+
+    # Work hours
     wh = _s(row.get("weekly_work_hours"))
     if wh >= 20:
         factors.append(f"High external workload ({int(wh)} hrs/week)")
@@ -326,37 +345,35 @@ def _detect_stage2(row: pd.Series) -> dict:
 
 def _detect_stage3(row: pd.Series) -> dict:
     """
-    Stage 3 rule-based detection.
-    Builds on Stage 2 signals and adds examiner + thesis seminar assessment.
+    Stage 3 pre-deadline early warning.
+    Builds on Stage 2; adds thesis seminar deadline warning (no Examiner score).
     """
-    exam     = _s(row.get("examiner_avg_score"))
-    ts_delay = _s(row.get("thesis_seminar_delay"))
+    ts_delay    = _s(row.get("thesis_seminar_delay"))
+    ts_complete = bool(_s(row.get("thesis_seminar_completed")))
 
     # Stage 2 base (carry forward PPM/RPD signals)
     s2      = _detect_stage2(row)
     factors = [f for f in s2["factors"] if "No major" not in f]
 
+    # ── Pre-deadline windows ──────────────────────────────────────────────────
+    ts_due_within_30 = (not ts_complete) and (-30 <= ts_delay < 0)
+    ts_due_within_60 = (not ts_complete) and (-60 <= ts_delay < -30)
+
     # ── Determine label ───────────────────────────────────────────────────────
-    if exam > 0 and exam < 2.5:
+    if ts_due_within_30:
         label = "High"
-        factors.append(f"Low examiner avg score ({exam:.1f}/5)")
-    elif ts_delay > 90:
-        label = "High"
-        factors.append(f"Thesis seminar overdue by {int(ts_delay)} days")
+        factors.append(f"Thesis seminar due in {int(-ts_delay)} days — action required")
     elif s2["risk_label"] == "High":
         label = "High"
-    elif exam > 0 and exam < 3.5:
+    elif ts_due_within_60:
         label = "Medium"
-        factors.append(f"Moderate examiner avg score ({exam:.1f}/5)")
-    elif ts_delay > 30:
-        label = "Medium"
-        factors.append(f"Thesis seminar delayed by {int(ts_delay)} days")
+        factors.append(f"Thesis seminar due in {int(-ts_delay)} days — prepare early")
     elif s2["risk_label"] == "Medium":
         label = "Medium"
     else:
         label = "Low"
-        if exam >= 3.5:
-            factors.append(f"Good examiner avg score ({exam:.1f}/5)")
+        if ts_complete:
+            factors.append("Thesis seminar completed")
 
     if not factors:
         factors.append("No major risk indicators")
@@ -409,16 +426,14 @@ _FEATURE_QUERY = text("""
         (SELECT COUNT(*) FROM student_publication sp
          WHERE sp.student_id = s.student_id)                 AS pub_submitted_count,
         CASE WHEN s.degree_type = 'PhD' THEN 2 ELSE 1 END   AS pub_required,
+        -- Publication days from deadline: negative = days until due, positive = overdue, 0 = done/no deadline
         CASE
             WHEN sm3.actual_date IS NOT NULL THEN 0
-            WHEN sm3.expected_date IS NOT NULL AND sm3.expected_date < CURDATE()
+            WHEN sm3.expected_date IS NOT NULL
                 THEN DATEDIFF(CURDATE(), sm3.expected_date)
             ELSE 0
-        END AS pub_overdue_days,
-        -- Examiner
-        (SELECT AVG(er.score_avg) FROM examiner_report er
-         WHERE er.student_id = s.student_id)                 AS examiner_avg_score,
-        -- Thesis seminar
+        END AS pub_days_from_deadline,
+        -- Thesis seminar: negative = days until due, positive = overdue
         CASE
             WHEN sm4.actual_date IS NOT NULL
                 THEN DATEDIFF(sm4.actual_date, sm4.expected_date)
@@ -426,6 +441,7 @@ _FEATURE_QUERY = text("""
                 THEN DATEDIFF(CURDATE(), sm4.expected_date)
             ELSE 0
         END AS thesis_seminar_delay,
+        (sm4.actual_date IS NOT NULL) AS thesis_seminar_completed,
         go.is_delayed
     FROM student s
     LEFT JOIN country c             ON s.country_id = c.country_id
@@ -456,21 +472,21 @@ def _extract_db_features() -> pd.DataFrame:
         "funding_name", "marital_status",
         "rpd_delay_days", "rpd_completed",
         "ppm_us_count", "ppm_total", "months_enrolled",
-        "pub_accepted_count", "pub_submitted_count", "pub_required", "pub_overdue_days",
-        "examiner_avg_score", "thesis_seminar_delay",
+        "pub_accepted_count", "pub_submitted_count", "pub_required", "pub_days_from_deadline",
+        "thesis_seminar_delay", "thesis_seminar_completed",
         "is_delayed",
     ])
 
     num_cols = [
         "age_at_enrollment", "entry_gpa", "weekly_work_hours", "family_support",
         "rpd_delay_days", "rpd_completed", "ppm_us_count", "ppm_total", "months_enrolled",
-        "pub_accepted_count", "pub_submitted_count", "pub_required", "pub_overdue_days",
-        "examiner_avg_score", "thesis_seminar_delay",
+        "pub_accepted_count", "pub_submitted_count", "pub_required", "pub_days_from_deadline",
+        "thesis_seminar_delay", "thesis_seminar_completed",
     ]
     for c in num_cols:
         df[c] = pd.to_numeric(df[c], errors="coerce")
-    for c in ["rpd_completed", "pub_overdue_days", "pub_accepted_count",
-              "pub_submitted_count", "pub_required"]:
+    for c in ["rpd_completed", "thesis_seminar_completed", "pub_days_from_deadline",
+              "pub_accepted_count", "pub_submitted_count", "pub_required"]:
         df[c] = df[c].fillna(0)
 
     return df
@@ -510,8 +526,7 @@ def _encode_features(df: pd.DataFrame, encoders: Optional[dict] = None):
         out[col]      = out[col].apply(lambda x: x if x in known else "Unknown")
         out[enc_name] = le.transform(out[col]).astype(float)
 
-    out["examiner_avg_score"] = out["examiner_avg_score"].fillna(0.0)
-    out["entry_gpa"]          = out["entry_gpa"].fillna(0.0)
+    out["entry_gpa"] = out["entry_gpa"].fillna(0.0)
 
     return out, encoders
 
@@ -522,18 +537,24 @@ def _encode_features(df: pd.DataFrame, encoders: Optional[dict] = None):
 
 def _determine_stage(row: pd.Series) -> int:
     """
-    Stage 3: student has at least one examiner report.
-    Stage 2: student has PPM records OR any milestone is overdue.
-    Stage 1: just enrolled, all milestones in the future.
+    Stage 3: thesis seminar is completed OR due within 180 days (actively relevant).
+    Stage 2: has PPM records OR RPD is completed/upcoming within 90 days.
+    Stage 1: just enrolled, no active milestones.
     """
-    if _s(row.get("examiner_avg_score")) > 0:
+    ts_delay    = _s(row.get("thesis_seminar_delay"))
+    ts_complete = bool(_s(row.get("thesis_seminar_completed")))
+    # Stage 3: thesis seminar done, or actively upcoming (within 180 days)
+    if ts_complete or (-180 <= ts_delay < 0):
         return 3
+
+    # Stage 2: has PPM history, or RPD is active (completed or upcoming within 90 days)
     if _s(row.get("ppm_total")) > 0:
         return 2
-    if _s(row.get("rpd_delay_days")) > 0:
+    rpd = _s(row.get("rpd_delay_days"))
+    rpd_completed = bool(_s(row.get("rpd_completed")))
+    if rpd_completed or (-90 <= rpd < 0):
         return 2
-    if _s(row.get("pub_overdue_days")) > 0:
-        return 2
+
     return 1
 
 
@@ -590,12 +611,13 @@ def train_and_predict_rf() -> dict:
     os.makedirs(_MODEL_DIR, exist_ok=True)
 
     mlflow_ok = False
-    try:
-        mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)
-        mlflow.set_experiment(settings.MLFLOW_EXPERIMENT_NAME + "_RF")
-        mlflow_ok = True
-    except Exception as e:
-        logger.warning(f"[RF] MLflow unavailable: {e}")
+    if _MLFLOW_AVAILABLE:
+        try:
+            mlflow.set_tracking_uri(getattr(settings, "MLFLOW_TRACKING_URI", ""))
+            mlflow.set_experiment(getattr(settings, "MLFLOW_EXPERIMENT_NAME", "datatrain") + "_RF")
+            mlflow_ok = True
+        except Exception as e:
+            logger.warning(f"[RF] MLflow unavailable: {e}")
 
     all_metrics: dict = {}
 

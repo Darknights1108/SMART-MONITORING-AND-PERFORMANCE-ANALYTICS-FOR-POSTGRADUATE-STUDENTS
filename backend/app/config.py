@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
     def get_database_url(self) -> str:
         if self.DATABASE_URL:
