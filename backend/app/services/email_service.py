@@ -30,15 +30,26 @@ async def send_email(
     msg.attach(MIMEText(body, content_type, "utf-8"))
 
     try:
-        use_tls = bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USER or None,
-            password=settings.SMTP_PASSWORD or None,
-            start_tls=use_tls,
-        )
+        use_auth = bool(settings.SMTP_USER and settings.SMTP_PASSWORD)
+        if use_auth:
+            # Gmail / real SMTP — aiosmtplib 3.x auto-negotiates STARTTLS on port 587
+            smtp = aiosmtplib.SMTP(
+                hostname=settings.SMTP_HOST,
+                port=settings.SMTP_PORT,
+                use_tls=False,
+                start_tls=True,
+            )
+            await smtp.connect()
+            await smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD.replace(" ", ""))
+            await smtp.send_message(msg)
+            await smtp.quit()
+        else:
+            # Mailpit / unauthenticated local SMTP
+            await aiosmtplib.send(
+                msg,
+                hostname=settings.SMTP_HOST,
+                port=settings.SMTP_PORT,
+            )
         return True
     except Exception as e:
         print(f"[EMAIL ERROR] Failed to send to {to_email}: {e}")

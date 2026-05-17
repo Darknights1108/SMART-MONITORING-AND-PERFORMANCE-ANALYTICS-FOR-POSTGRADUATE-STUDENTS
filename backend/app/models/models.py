@@ -73,34 +73,41 @@ class Student(Base):
     student_id = Column(Integer, primary_key=True, autoincrement=True)
     student_id_number = Column(String(50), nullable=False, unique=True)
     student_name = Column(String(200), nullable=False)
-    email = Column(String(200), nullable=False)
+    email = Column(String(200), nullable=True)
     campus_id = Column(Integer, ForeignKey("campus.campus_id"), nullable=False)
 
+    # Term / intake info (from university system)
+    campus_code = Column(String(20), nullable=True)
+    admit_term = Column(Integer, nullable=True)
+    admit_term_begin_date = Column(Date, nullable=True)
+    expected_grad_term = Column(Integer, nullable=True)
+    program_status = Column(String(50), nullable=True, default="Active in Program")
+
     # Demographic
-    gender = Column(Enum("Male", "Female", "Other"), nullable=False)
-    date_of_birth = Column(Date, nullable=False)
-    country_id = Column(Integer, ForeignKey("country.country_id"), nullable=False)
-    marital_status = Column(Enum("Single", "Married", "Divorced", "Widowed"), nullable=False)
+    gender = Column(Enum("Male", "Female", "Other"), nullable=True)
+    date_of_birth = Column(Date, nullable=True)
+    country_id = Column(Integer, ForeignKey("country.country_id"), nullable=True)
+    marital_status = Column(Enum("Single", "Married", "Divorced", "Widowed"), nullable=True)
     num_children = Column(Integer, nullable=False, default=0)
     youngest_child_age = Column(DECIMAL(3, 1), nullable=True)
 
     # Academic
     program_id = Column(Integer, ForeignKey("program.program_id"), nullable=False)
     degree_type = Column(Enum("Master", "PhD"), nullable=False)
-    discipline_id = Column(Integer, ForeignKey("discipline.discipline_id"), nullable=False)
+    discipline_id = Column(Integer, ForeignKey("discipline.discipline_id"), nullable=True)
     enrollment_date = Column(Date, nullable=False)
     entry_gpa = Column(DECIMAL(4, 2), nullable=True)
     is_cross_discipline = Column(Boolean, nullable=False, default=False)
     study_method = Column(Enum("Full-time", "Part-time"), nullable=False)
 
     # Financial
-    funding_id = Column(Integer, ForeignKey("funding_type.funding_id"), nullable=False)
+    funding_id = Column(Integer, ForeignKey("funding_type.funding_id"), nullable=True)
     has_external_work = Column(Boolean, nullable=False, default=False)
     weekly_work_hours = Column(DECIMAL(4, 1), nullable=False, default=0)
 
     # Social
     in_research_group = Column(Boolean, nullable=False, default=False)
-    family_support = Column(Integer, nullable=False)
+    family_support = Column(Integer, nullable=True)
 
     # Relationships
     campus = relationship("Campus")
@@ -139,6 +146,7 @@ class StudentMilestone(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(Integer, ForeignKey("student.student_id"), nullable=False)
     milestone_id = Column(Integer, ForeignKey("milestone.milestone_id"), nullable=False)
+    earliest_start_date = Column(Date, nullable=True)  # Only used by Thesis Seminar
     expected_date = Column(Date, nullable=True)
     actual_date = Column(Date, nullable=True)
     status = Column(Enum("Pending", "Completed", "Overdue"), nullable=False, default="Pending")
@@ -304,6 +312,19 @@ class ChatHistory(Base):
 # =====================
 # 11. REMINDER RULES
 # =====================
+
+class StudentRiskPrediction(Base):
+    __tablename__ = "student_risk_prediction"
+    prediction_id    = Column(Integer, primary_key=True, autoincrement=True)
+    student_id       = Column(Integer, ForeignKey("student.student_id"), nullable=False, unique=True)
+    risk_score       = Column(DECIMAL(5, 2), nullable=False)
+    risk_label       = Column(Enum("Low", "Medium", "High"), nullable=False)
+    cluster_id       = Column(Integer, nullable=False)
+    key_risk_factors = Column(Text, nullable=True)   # JSON array string
+    predicted_at     = Column(DateTime, nullable=False, server_default=func.now())
+
+    student = relationship("Student")
+
 
 class ReminderRule(Base):
     __tablename__ = "reminder_rule"

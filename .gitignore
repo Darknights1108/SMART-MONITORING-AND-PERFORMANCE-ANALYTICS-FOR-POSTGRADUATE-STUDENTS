@@ -28,3 +28,6 @@ Thumbs.db
 # Logs
 *.log
 
+
+# ML model artefacts (regenerated at runtime)
+backend/app/ml_models/*.joblib

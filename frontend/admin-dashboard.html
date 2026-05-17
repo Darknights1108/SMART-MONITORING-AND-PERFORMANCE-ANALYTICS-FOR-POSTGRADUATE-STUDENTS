@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Postgraduate Monitoring System</title>
+  <link rel="stylesheet" href="admin-dashboard.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Dashboard navigation">
+      <div class="system-name">
+        <span>Postgraduate</span>
+        <strong>Monitoring System</strong>
+      </div>
+      <nav>
+        <a class="active" href="#analytics">Analytics</a>
+        <a href="#records">Records</a>
+        <a href="#alerts">Alerts</a>
+      </nav>
+      <button id="logoutButton" class="logout-button" type="button">Logout</button>
+    </aside>
+
+    <main class="dashboard">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Admin Workspace</p>
+          <h1>Data Analysis Dashboard</h1>
+        </div>
+        <div class="user-pill" id="userPill">Admin</div>
+      </header>
+
+      <section class="kpi-grid" aria-label="Dashboard summary">
+        <article class="kpi">
+          <span>Total Students</span>
+          <strong id="totalStudents">--</strong>
+        </article>
+        <article class="kpi">
+          <span>Overdue Students</span>
+          <strong id="overdueStudents">--</strong>
+        </article>
+        <article class="kpi">
+          <span>Upcoming 7 Days</span>
+          <strong id="upcomingSeven">--</strong>
+        </article>
+        <article class="kpi">
+          <span>PPM At Risk</span>
+          <strong id="ppmRisk">--</strong>
+        </article>
+      </section>
+
+      <section id="analytics" class="analytics-area">
+        <div class="toolbar">
+          <div class="control-group">
+            <label for="datasetSelect">Dataset</label>
+            <select id="datasetSelect">
+              <option value="status_pie">Graduation Status</option>
+              <option value="faculty_bar">Students by Faculty</option>
+              <option value="milestone_bar">Milestone Completion</option>
+              <option value="monthly_trend">Enrollment Trend</option>
+              <option value="funding_comparison">Funding Delay Rate</option>
+              <option value="country_region">Students by Region</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label for="chartModeSelect">Visual</label>
+            <select id="chartModeSelect">
+              <option value="auto">Auto</option>
+              <option value="bar">Bar</option>
+              <option value="line">Line</option>
+              <option value="pie">Pie</option>
+              <option value="table">Table</option>
+            </select>
+          </div>
+
+          <button id="refreshButton" class="primary-button" type="button">Refresh</button>
+        </div>
+
+        <div class="visual-grid">
+          <section class="visual-panel" aria-labelledby="chartTitle">
+            <div class="panel-heading">
+              <h2 id="chartTitle">Chart</h2>
+              <p id="chartMeta">SQL-backed dashboard data</p>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="chartCanvas" width="960" height="520"></canvas>
+              <div id="tableOnlyNotice" class="table-only hidden">Table view selected</div>
+            </div>
+          </section>
+
+          <section class="data-panel" aria-labelledby="tableTitle">
+            <div class="panel-heading">
+              <h2 id="tableTitle">Data Table</h2>
+              <p id="rowCount">0 rows</p>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead id="chartTableHead"></thead>
+                <tbody id="chartTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="records" class="records-area">
+        <div class="tabbar" role="tablist" aria-label="Operational data">
+          <button class="tab active" type="button" data-tab="deadlines">Upcoming Deadlines</button>
+          <button class="tab" type="button" data-tab="overdue">Overdue</button>
+          <button class="tab" type="button" data-tab="emails">Email Log</button>
+        </div>
+
+        <div class="records-table-wrap">
+          <table>
+            <thead id="recordsTableHead"></thead>
+            <tbody id="recordsTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <p id="statusMessage" class="status-message" role="status" aria-live="polite"></p>
+    </main>
+  </div>
+
+  <script src="admin-dashboard.js"></script>
+</body>
+</html>
