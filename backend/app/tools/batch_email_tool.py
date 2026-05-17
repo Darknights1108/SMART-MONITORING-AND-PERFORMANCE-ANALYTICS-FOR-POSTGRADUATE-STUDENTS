@@ -34,13 +34,13 @@ _FILTER_QUERIES: dict[str, str] = {
     "high_risk": """
         SELECT DISTINCT s.student_id, s.student_name, s.email
         FROM student s
-        JOIN risk_prediction rp ON s.student_id = rp.student_id
+        JOIN student_risk_prediction rp ON s.student_id = rp.student_id
         WHERE rp.risk_label = 'High'
     """,
     "medium_risk": """
         SELECT DISTINCT s.student_id, s.student_name, s.email
         FROM student s
-        JOIN risk_prediction rp ON s.student_id = rp.student_id
+        JOIN student_risk_prediction rp ON s.student_id = rp.student_id
         WHERE rp.risk_label = 'Medium'
     """,
     "ppm_unsatisfactory": """

@@ -37,7 +37,7 @@ def get_weekly_digest() -> str:
         # 2. High-risk students
         high_risk = db.execute(text("""
             SELECT s.student_name, s.student_id_number, rp.risk_score
-            FROM risk_prediction rp
+            FROM student_risk_prediction rp
             JOIN student s ON rp.student_id = s.student_id
             WHERE rp.risk_label = 'High'
             ORDER BY rp.risk_score DESC

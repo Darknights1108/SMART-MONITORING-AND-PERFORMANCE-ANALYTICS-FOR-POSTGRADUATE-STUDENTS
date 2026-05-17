@@ -32,7 +32,7 @@ async def check_and_push_alerts():
         # High risk students
         high_risk = db.execute(text("""
             SELECT s.student_name
-            FROM risk_prediction rp
+            FROM student_risk_prediction rp
             JOIN student s ON rp.student_id = s.student_id
             WHERE rp.risk_label = 'High'
         """)).fetchall()

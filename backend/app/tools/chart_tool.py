@@ -111,7 +111,7 @@ def _fetch(db, chart_type: str, source: str) -> dict | None:
     if source == "risk_distribution":
         rows = db.execute(text("""
             SELECT risk_label, COUNT(*) AS cnt
-            FROM risk_prediction
+            FROM student_risk_prediction
             GROUP BY risk_label
             ORDER BY FIELD(risk_label,'High','Medium','Low')
         """)).fetchall()

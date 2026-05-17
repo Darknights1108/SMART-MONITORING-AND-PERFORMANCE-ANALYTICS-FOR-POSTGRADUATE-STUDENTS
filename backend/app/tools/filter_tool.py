@@ -45,7 +45,7 @@ def filter_students(criteria: str) -> str:
             added_joins.add(alias)
 
     if "risk_label" in filters:
-        add_join("rp", "LEFT JOIN risk_prediction rp ON s.student_id = rp.student_id")
+        add_join("rp", "LEFT JOIN student_risk_prediction rp ON s.student_id = rp.student_id")
         wheres.append("rp.risk_label = :risk_label")
         params["risk_label"] = filters["risk_label"]
 
@@ -127,7 +127,7 @@ def filter_students(criteria: str) -> str:
 
     extra_joins = (
         "LEFT JOIN program prog2 ON s.program_id = prog2.program_id "
-        "LEFT JOIN risk_prediction rp2 ON s.student_id = rp2.student_id"
+        "LEFT JOIN student_risk_prediction rp2 ON s.student_id = rp2.student_id"
     )
 
     join_str = " ".join(joins)
