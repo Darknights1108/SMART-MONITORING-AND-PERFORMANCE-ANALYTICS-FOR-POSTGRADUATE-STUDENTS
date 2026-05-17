@@ -12,6 +12,7 @@ from app.tools.email_tools import (
     has_pending_sends, execute_pending_sends, clear_pending_sends,
     stage_email_draft, get_pending_display,
 )
+from app.tools.chart_tool import render_chart
 from app.services.connection_manager import manager
 import uuid
 import json
@@ -24,6 +25,69 @@ _CANCEL_WORDS  = {"n", "no", "cancel", "取消", "不", "算了", "discard"}
 
 _EMAIL_RE      = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')
 _SEND_INTENT_RE = re.compile(r'\b(send|email|邮件|发送|发邮件)\b', re.IGNORECASE)
+
+# ── Chart intent detection ─────────────────────────────────────────────────────
+# Maps regex patterns to (chart_type, data_source)
+_CHART_SOURCES = [
+    (re.compile(r'\brisk[\s_-]?distrib\w*|风险分布', re.I), 'risk_distribution'),
+    (re.compile(r'\brpd\b',                                re.I), 'rpd'),
+    (re.compile(r'\bpublication\b|\bpub\b',                re.I), 'publication'),
+    (re.compile(r'\bppm\b',                                re.I), 'ppm'),
+    (re.compile(r'\bmilestone[\s_-]?completion|milestones?\b', re.I), 'milestone_completion'),
+    (re.compile(r'\benrollment[\s_-]?trend|\benrollment\b', re.I), 'enrollment_trend'),
+    (re.compile(r'\bfaculty\b',                             re.I), 'faculty'),
+    (re.compile(r'\bdiscipline\b',                          re.I), 'discipline'),
+    (re.compile(r'\bfunding\b',                             re.I), 'funding'),
+    (re.compile(r'\b(country|region)\b',                    re.I), 'country_region'),
+]
+
+_CHART_TRIGGER = re.compile(
+    r'\b(show|plot|visuali[sz]e|chart|graph|display|render|draw|展示|图表|可视化|'
+    r'pie|bar|histogram|line chart|折线|饼图|柱状|条形)\b',
+    re.I,
+)
+_CHART_TYPE_MAP = [
+    (re.compile(r'\bpie\b|饼图', re.I),                 'pie'),
+    (re.compile(r'\bbar\b|\bhistogram\b|柱状|条形', re.I), 'bar'),
+    (re.compile(r'\bline\b|\btrend\b|折线',  re.I),       'line'),
+]
+
+
+def _detect_chart_intent(message: str) -> list[dict] | None:
+    """
+    Return a list of chart specs if the message is clearly a chart request,
+    otherwise None (hand off to the agent).
+    """
+    if not _CHART_TRIGGER.search(message):
+        return None
+
+    # Determine chart type (default: bar)
+    chart_type = 'bar'
+    for pattern, ctype in _CHART_TYPE_MAP:
+        if pattern.search(message):
+            chart_type = ctype
+            break
+
+    # Find matching data sources
+    specs = []
+    for pattern, source in _CHART_SOURCES:
+        if pattern.search(message):
+            specs.append({"type": chart_type, "data_source": source})
+
+    # Multi-source: allow per-segment type override
+    # e.g. "RPD in pie and publication in bar"
+    if len(specs) > 1:
+        refined = []
+        for spec in specs:
+            seg_type = chart_type
+            for pattern, ctype in _CHART_TYPE_MAP:
+                if pattern.search(message):
+                    seg_type = ctype
+                    break
+            refined.append({**spec, "type": seg_type})
+        specs = refined
+
+    return specs if specs else None
 
 
 def _matches_words(message: str, word_set: set) -> bool:
@@ -166,6 +230,35 @@ async def chat_websocket(websocket: WebSocket):
                 VALUES (:sid, :sess, :msg, 'user')
             """), {"sid": supervisor_id, "sess": session_id, "msg": user_message})
             db.commit()
+
+            # ── Fast-path: chart requests bypass the LLM entirely ─────────────
+            chart_specs = _detect_chart_intent(user_message)
+            if chart_specs:
+                await websocket.send_json({"type": "thinking"})
+                try:
+                    result_str = await asyncio.to_thread(
+                        render_chart, json.dumps(chart_specs)
+                    )
+                    payload = json.loads(result_str)
+                    if payload.get("__chart_action__"):
+                        await websocket.send_json({
+                            "type": "chart_action",
+                            "message": result_str,
+                            "timestamp": datetime.now().isoformat(),
+                        })
+                    else:
+                        await websocket.send_json({
+                            "type": "message",
+                            "message": payload.get("error", "No chart data found."),
+                            "timestamp": datetime.now().isoformat(),
+                        })
+                except Exception as e:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Chart error: {e}",
+                    })
+                continue
+            # ──────────────────────────────────────────────────────────────────
 
             # Send "thinking" indicator
             await websocket.send_json({"type": "thinking"})

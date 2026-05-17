@@ -100,6 +100,12 @@ def extract_features() -> pd.DataFrame:
             "rpd_delay_days", "ppm_us_count", "ppm_total",
             "examiner_avg_score",
         ])
+        # DB returns decimal.Decimal for numeric columns; cast to float for pandas arithmetic
+        _numeric = ["weekly_work_hours", "is_cross_discipline", "in_research_group",
+                    "family_support", "rpd_delay_days", "ppm_us_count", "ppm_total",
+                    "examiner_avg_score"]
+        for col in _numeric:
+            df[col] = pd.to_numeric(df[col], errors="coerce").astype(float)
         return df
     finally:
         db.close()
@@ -121,11 +127,9 @@ def compute_risk_scores(df: pd.DataFrame) -> pd.DataFrame:
 
     # --- individual normalised features ---
     out["rpd_delay_norm"]        = _normalize(out["rpd_delay_days"], -30, 180)
-    out["ppm_us_rate"]           = np.where(
-        out["ppm_total"] > 0,
-        out["ppm_us_count"] / out["ppm_total"],
-        0.0,
-    )
+    out["ppm_us_rate"]           = (
+        out["ppm_us_count"] / out["ppm_total"].replace(0.0, float("nan"))
+    ).fillna(0.0)
     out["work_hours_norm"]       = _normalize(out["weekly_work_hours"], 0, 40)
     out["is_part_time"]          = (out["study_method"] == "Part-time").astype(float)
     out["is_cross_discipline"]   = out["is_cross_discipline"].astype(float)
