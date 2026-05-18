@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { Send, Bot, User, RefreshCw, ChevronDown } from 'lucide-react'
+import { Send, Bot, User, RefreshCw, ChevronDown, PlusCircle } from 'lucide-react'
 import { getToken } from '@/lib/auth'
 import { wsUrl } from '@/lib/api'
 import {
@@ -38,6 +38,36 @@ const DEFAULT_COLORS = [
   '#6366f1','#22c55e','#f59e0b','#ef4444',
   '#0ea5e9','#a855f7','#ec4899','#14b8a6',
 ]
+
+const INITIAL_MESSAGES: Message[] = [
+  { id: 0, role: 'assistant', content: "Hello! I'm your AI Assistant. Ask me anything about students, milestones, risk predictions, or deadlines, or ask me to show data as a chart!" },
+]
+
+const CHAT_STORAGE_KEY = 'pms-chat-page-messages-v1'
+
+function getInitialMessages(): Message[] {
+  return INITIAL_MESSAGES.map(message => ({ ...message }))
+}
+
+function loadStoredMessages(): Message[] {
+  if (typeof window === 'undefined') return getInitialMessages()
+
+  try {
+    const raw = window.localStorage.getItem(CHAT_STORAGE_KEY)
+    if (!raw) return getInitialMessages()
+
+    const parsed = JSON.parse(raw) as Message[]
+    if (!Array.isArray(parsed) || parsed.length === 0) return getInitialMessages()
+
+    return parsed
+  } catch {
+    return getInitialMessages()
+  }
+}
+
+function nextMessageId(messages: Message[]): number {
+  return messages.reduce((max, message) => Math.max(max, Number(message.id) || 0), 0) + 1
+}
 
 // ── Chart component ────────────────────────────────────────────────────────────
 function InlineChart({ spec }: { spec: ChartSpec }) {
@@ -153,12 +183,28 @@ export default function ChatPage() {
   const [showSteps, setShowSteps] = useState(false)
   const [connected, setConnected] = useState(false)
   const [model, setModel]         = useState<'local' | 'external'>('local')
+  const [storageReady, setStorageReady] = useState(false)
 
   const ws    = useRef<WebSocket | null>(null)
   const end   = useRef<HTMLDivElement>(null)
-  const idRef = useRef(1)
+  const idRef = useRef(nextMessageId(messages))
 
   useEffect(() => { end.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, thinking])
+  useEffect(() => {
+    const stored = loadStoredMessages()
+    setMessages(stored)
+    idRef.current = nextMessageId(stored)
+    setStorageReady(true)
+  }, [])
+  useEffect(() => {
+    if (!storageReady) return
+
+    try {
+      window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages))
+    } catch {
+      // Ignore storage errors so chat still works in restricted browser modes.
+    }
+  }, [messages, storageReady])
   useEffect(() => { connect(); return () => ws.current?.close() }, [])
 
   function handleModelSwitch(m: 'local' | 'external') {
@@ -260,6 +306,27 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
+  function handleNewConversation() {
+    const fresh = getInitialMessages()
+    setMessages(fresh)
+    setSteps([])
+    setInput('')
+    setThinking(false)
+    setShowSteps(false)
+    idRef.current = nextMessageId(fresh)
+
+    try {
+      window.localStorage.removeItem(CHAT_STORAGE_KEY)
+    } catch {
+      // Ignore storage errors so reset still works visually.
+    }
+
+    ws.current?.close()
+    ws.current = null
+    setConnected(false)
+    setTimeout(connect, 100)
+  }
+
   const stepLabel: Record<string, string> = {
     agent_thinking: '🤔 Thinking',
     tool_call:      '🔧 Tool call',
@@ -279,6 +346,14 @@ export default function ChatPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleNewConversation}
+            title="Start a new conversation"
+            className="flex items-center gap-1 text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition"
+          >
+            <PlusCircle className="w-3 h-3" />
+            New conversation
+          </button>
           {/* Model toggle */}
           <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             {(['local', 'external'] as const).map(m => (
