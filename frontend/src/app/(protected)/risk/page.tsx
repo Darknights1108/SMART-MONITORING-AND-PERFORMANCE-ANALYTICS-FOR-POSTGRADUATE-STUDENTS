@@ -186,10 +186,10 @@ export default function RiskPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         <RiskBadge label={p.risk_label} />
-                        {p.prediction_stage === 1 && (
+                        {(p.prediction_stage === 1 || p.is_new_student) && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600 border border-blue-100 w-fit">
                             <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            Early Prediction
+                            {p.is_new_student ? 'New Student · Early Prediction' : 'Early Prediction'}
                           </span>
                         )}
                       </div>

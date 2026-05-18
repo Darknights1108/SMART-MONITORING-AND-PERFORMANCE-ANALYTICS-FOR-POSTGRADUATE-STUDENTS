@@ -537,10 +537,15 @@ def _encode_features(df: pd.DataFrame, encoders: Optional[dict] = None):
 
 def _determine_stage(row: pd.Series) -> int:
     """
+    Stage 1: enrolled ≤3 months ago (new student, Stage 2 not yet begun) — early prediction.
     Stage 3: thesis seminar is completed OR due within 180 days (actively relevant).
     Stage 2: has PPM records OR RPD is completed/upcoming within 90 days.
-    Stage 1: just enrolled, no active milestones.
+    Stage 1 (fallback): just enrolled, no active milestones.
     """
+    # New student override — always Stage 1 / early prediction
+    if _s(row.get("months_enrolled")) <= 3:
+        return 1
+
     ts_delay    = _s(row.get("thesis_seminar_delay"))
     ts_complete = bool(_s(row.get("thesis_seminar_completed")))
     # Stage 3: thesis seminar done, or actively upcoming (within 180 days)

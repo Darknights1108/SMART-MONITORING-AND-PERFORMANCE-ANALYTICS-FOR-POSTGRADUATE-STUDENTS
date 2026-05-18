@@ -313,6 +313,7 @@ def train_and_predict() -> dict:
 # ──────────────────────────────────────────────────────────────────────────────
 def get_all_predictions() -> list[dict]:
     """Return all current predictions with student info."""
+    from datetime import date as _date
     db = SyncSessionLocal()
     try:
         rows = db.execute(text("""
@@ -322,12 +323,14 @@ def get_all_predictions() -> list[dict]:
                 s.student_name,
                 s.degree_type,
                 s.study_method,
+                s.enrollment_date,
                 p.faculty_description,
                 rp.risk_score,
                 rp.risk_label,
                 rp.cluster_id,
                 rp.key_risk_factors,
-                rp.predicted_at
+                rp.predicted_at,
+                TIMESTAMPDIFF(MONTH, s.enrollment_date, CURDATE()) AS months_enrolled
             FROM student_risk_prediction rp
             JOIN student s ON s.student_id = rp.student_id
             JOIN program pr ON s.program_id = pr.program_id
@@ -345,7 +348,8 @@ def get_all_predictions() -> list[dict]:
                 "faculty":           r.faculty_description,
                 "risk_score":        float(r.risk_score),
                 "risk_label":        r.risk_label,
-                "cluster_id":        r.cluster_id,
+                "prediction_stage":  r.cluster_id,           # renamed from cluster_id
+                "is_new_student":    (r.months_enrolled is not None and r.months_enrolled <= 3),
                 "key_risk_factors":  json.loads(r.key_risk_factors or "[]"),
                 "predicted_at":      r.predicted_at.isoformat() if r.predicted_at else None,
             }
