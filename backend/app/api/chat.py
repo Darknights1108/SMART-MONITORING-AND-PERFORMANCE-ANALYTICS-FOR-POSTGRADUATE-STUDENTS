@@ -55,9 +55,20 @@ _CHART_SOURCES = [
     (re.compile(r'\b(country|region)\b',                    re.I), 'country_region'),
 ]
 
-_CHART_TRIGGER = re.compile(
-    r'\b(show|plot|visuali[sz]e|chart|graph|display|render|draw|展示|图表|可视化|'
-    r'pie|bar|histogram|line chart|折线|饼图|柱状|条形)\b',
+# Strong trigger: alone is enough to indicate a chart request
+_CHART_TRIGGER_STRONG = re.compile(
+    r'\b(plot|visuali[sz]e|chart|graph|histogram|图表|可视化|饼图|柱状|条形)\b'
+    r'|\bpie\s+chart\b|\bbar\s+chart\b|\bline\s+chart\b',
+    re.I,
+)
+# Weak trigger: only counts when an explicit chart-type word is also present
+_CHART_TRIGGER_WEAK = re.compile(
+    r'\b(show|display|render|draw|展示)\b',
+    re.I,
+)
+# Explicit chart-type words needed to activate weak triggers
+_CHART_TYPE_WORD = re.compile(
+    r'\b(pie|bar|line|histogram|折线|饼图|柱状|条形)\b',
     re.I,
 )
 _CHART_TYPE_MAP = [
@@ -80,10 +91,15 @@ def _detect_chart_intent(message: str) -> list[dict] | None:
     Return a list of chart specs if the message is clearly a chart request,
     otherwise None (hand off to the agent).
 
-    Handles multi-chart messages like "RPD in pie and publication in bar"
-    by splitting on 'and'/',' and detecting type per segment.
+    Strong triggers (plot/visualize/chart/graph/…) fire alone.
+    Weak triggers (show/display/…) only fire when an explicit chart-type
+    word (pie/bar/line/…) is also present — prevents "show me students
+    with overdue RPD" from being misread as a chart request.
     """
-    if not _CHART_TRIGGER.search(message):
+    has_strong = _CHART_TRIGGER_STRONG.search(message)
+    has_weak   = _CHART_TRIGGER_WEAK.search(message)
+    has_type   = _CHART_TYPE_WORD.search(message)
+    if not (has_strong or (has_weak and has_type)):
         return None
 
     # Split into segments so each source+type pair can be detected independently
