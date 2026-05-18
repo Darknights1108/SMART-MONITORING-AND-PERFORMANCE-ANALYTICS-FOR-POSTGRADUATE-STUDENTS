@@ -268,14 +268,17 @@ def list_supervisors(user: dict = Depends(require_admin)):
                 sup.name,
                 sup.email,
                 sup.role,
+                sup.faculty_id,
                 f.faculty_description,
                 sup.is_active,
+                sup.max_students,
                 COUNT(DISTINCT ss.student_id) AS student_count
             FROM supervisor sup
             LEFT JOIN faculty f ON sup.faculty_id = f.faculty_id
             LEFT JOIN student_supervisor ss ON sup.supervisor_id = ss.supervisor_id
             GROUP BY sup.supervisor_id, sup.staff_id, sup.name, sup.email,
-                     sup.role, f.faculty_description, sup.is_active
+                     sup.role, sup.faculty_id, f.faculty_description,
+                     sup.is_active, sup.max_students
             ORDER BY sup.name ASC
         """)).fetchall()
 
@@ -286,12 +289,82 @@ def list_supervisors(user: dict = Depends(require_admin)):
                 "name":           r.name,
                 "email":          r.email,
                 "role":           r.role,
+                "faculty_id":     r.faculty_id,
                 "faculty":        r.faculty_description,
                 "is_active":      bool(r.is_active),
+                "max_students":   r.max_students,
                 "student_count":  int(r.student_count),
             }
             for r in rows
         ]
+    finally:
+        db.close()
+
+
+class UpdateSupervisorRequest(BaseModel):
+    name: str | None = None
+    email: str | None = None
+    faculty_id: int | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    max_students: int | None = None   # None = no limit
+
+
+@router.put("/api/supervisors/{supervisor_id}")
+def update_supervisor(
+    supervisor_id: int,
+    body: UpdateSupervisorRequest,
+    user: dict = Depends(require_admin),
+):
+    """Update supervisor info and/or student cap. Admin only."""
+    db = SyncSessionLocal()
+    try:
+        existing = db.execute(
+            text("SELECT supervisor_id FROM supervisor WHERE supervisor_id = :id"),
+            {"id": supervisor_id},
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Supervisor not found.")
+
+        fields, params = [], {"id": supervisor_id}
+        if body.name is not None:
+            fields.append("name = :name");        params["name"] = body.name
+        if body.email is not None:
+            # Check email uniqueness (exclude self)
+            dup = db.execute(text(
+                "SELECT 1 FROM supervisor WHERE email = :email AND supervisor_id != :id"
+            ), {"email": body.email, "id": supervisor_id}).fetchone()
+            if dup:
+                raise HTTPException(status_code=409, detail=f"Email '{body.email}' already in use.")
+            fields.append("email = :email");      params["email"] = body.email
+        if body.faculty_id is not None:
+            fields.append("faculty_id = :fid");  params["fid"] = body.faculty_id
+        if body.role is not None:
+            fields.append("role = :role");        params["role"] = body.role
+        if body.is_active is not None:
+            fields.append("is_active = :active"); params["active"] = int(body.is_active)
+        if body.max_students is not None:
+            fields.append("max_students = :ms");  params["ms"] = body.max_students
+        else:
+            # Explicitly pass None → clear the limit
+            if "max_students" in body.model_fields_set:
+                fields.append("max_students = NULL")
+
+        if not fields:
+            return {"success": True, "message": "Nothing to update."}
+
+        db.execute(
+            text(f"UPDATE supervisor SET {', '.join(fields)} WHERE supervisor_id = :id"),
+            params,
+        )
+        db.commit()
+        return {"success": True, "message": "Supervisor updated."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 

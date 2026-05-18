@@ -100,6 +100,8 @@ export const createStudent    = (data: any) =>
   req<any>('/api/students/',    { method: 'POST', body: JSON.stringify(data) })
 export const createSupervisor = (data: any) =>
   req<any>('/api/supervisors/', { method: 'POST', body: JSON.stringify(data) })
+export const updateSupervisor = (id: number, data: any) =>
+  req<any>(`/api/supervisors/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 
 // ── WebSocket URL ─────────────────────────────────────────────────────────────
 export function wsUrl(): string {
