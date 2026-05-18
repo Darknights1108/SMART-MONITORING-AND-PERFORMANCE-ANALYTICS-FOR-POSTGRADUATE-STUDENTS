@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # External AI Model (e.g. MiMo-v2-Omni)
     EXTERNAL_MODEL_API_KEY: str = ""
-    EXTERNAL_MODEL_BASE_URL: str = "https://api.mimo.ai/v1"
+    EXTERNAL_MODEL_BASE_URL: str = "https://token-plan-sgp.xiaomimimo.com/v1"
     EXTERNAL_MODEL_NAME: str = "mimo-v2-omni"
 
     # Scheduler
