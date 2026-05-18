@@ -50,8 +50,8 @@ def filter_students(criteria: str) -> str:
         params["risk_label"] = filters["risk_label"]
 
     if "is_part_time" in filters:
-        wheres.append("s.is_part_time = :is_part_time")
-        params["is_part_time"] = 1 if filters["is_part_time"] else 0
+        wheres.append("s.study_method = :study_method")
+        params["study_method"] = "Part-time" if filters["is_part_time"] else "Full-time"
 
     if "degree_type" in filters:
         wheres.append("s.degree_type = :degree_type")
@@ -121,7 +121,7 @@ def filter_students(criteria: str) -> str:
         "s.student_id, s.student_name, s.student_id_number, "
         "COALESCE(s.degree_type, '') AS degree_type, "
         "COALESCE(rp2.risk_label, 'N/A') AS risk_label, "
-        "s.is_part_time, s.has_external_work, s.is_cross_discipline"
+        "s.study_method, s.has_external_work, s.is_cross_discipline"
     )
 
     extra_joins = (
@@ -151,10 +151,10 @@ def filter_students(criteria: str) -> str:
         return f"No students found matching the given criteria: {criteria}"
 
     lines = [f"Found {len(rows)} student(s) matching criteria:\n"]
-    for sid, name, id_num, degree, risk, part_time, ext_work, cross_disc in rows:
+    for sid, name, id_num, degree, risk, study_method, ext_work, cross_disc in rows:
         flags = []
-        if part_time:
-            flags.append("Part-time")
+        if study_method:
+            flags.append(study_method)
         if ext_work:
             flags.append("External work")
         if cross_disc:
