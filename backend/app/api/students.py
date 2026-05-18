@@ -165,7 +165,7 @@ def get_student(student_id: int, user: dict = Depends(get_current_user)):
 
         # ── milestones ──
         milestones = db.execute(text("""
-            SELECT m.milestone_name, m.milestone_order,
+            SELECT sm.milestone_id, m.milestone_name, m.milestone_order,
                    sm.expected_date, sm.actual_date, sm.status, sm.remarks
             FROM student_milestone sm
             JOIN milestone m ON sm.milestone_id = m.milestone_id
@@ -222,6 +222,7 @@ def get_student(student_id: int, user: dict = Depends(get_current_user)):
             ],
             "milestones": [
                 {
+                    "milestone_id":  m.milestone_id,
                     "name":          m.milestone_name,
                     "order":         m.milestone_order,
                     "expected_date": str(m.expected_date) if m.expected_date else None,
@@ -769,6 +770,73 @@ def update_student(
         )
         db.commit()
         return {"success": True, "message": "Student updated."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UPDATE MILESTONE
+# ══════════════════════════════════════════════════════════════════════════════
+
+class UpdateMilestoneRequest(BaseModel):
+    expected_date: Optional[date]  = None
+    actual_date:   Optional[date]  = None
+    status:        Optional[str]   = None   # Pending | Completed | Overdue
+    remarks:       Optional[str]   = None
+
+
+@router.put("/api/students/{student_id}/milestones/{milestone_id}")
+def update_milestone(
+    student_id:   int,
+    milestone_id: int,
+    body: UpdateMilestoneRequest,
+    user: dict = Depends(require_admin),
+):
+    """Update a student milestone (dates, status, remarks). Admin only."""
+    db = SyncSessionLocal()
+    try:
+        existing = db.execute(text("""
+            SELECT 1 FROM student_milestone
+            WHERE student_id = :sid AND milestone_id = :mid
+        """), {"sid": student_id, "mid": milestone_id}).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Milestone record not found.")
+
+        fields, params = [], {"sid": student_id, "mid": milestone_id}
+
+        if body.expected_date is not None:
+            fields.append("expected_date = :expected_date")
+            params["expected_date"] = body.expected_date
+        if body.actual_date is not None:
+            fields.append("actual_date = :actual_date")
+            params["actual_date"] = body.actual_date
+        if body.status is not None:
+            fields.append("status = :status")
+            params["status"] = body.status
+        if body.remarks is not None:
+            fields.append("remarks = :remarks")
+            params["remarks"] = body.remarks
+
+        # Allow explicitly clearing actual_date
+        if "actual_date" in body.model_fields_set and body.actual_date is None:
+            fields.append("actual_date = NULL")
+
+        if not fields:
+            return {"success": True, "message": "Nothing to update."}
+
+        db.execute(text(f"""
+            UPDATE student_milestone
+            SET {', '.join(fields)}
+            WHERE student_id = :sid AND milestone_id = :mid
+        """), params)
+        db.commit()
+        return {"success": True, "message": "Milestone updated."}
 
     except HTTPException:
         raise

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import RiskBadge from '@/components/RiskBadge'
 import {
-  getStudent, updateStudent,
+  getStudent, updateStudent, updateMilestone,
   getPrograms, getCountries, getDisciplines,
   getFundingTypes, getCampuses,
 } from '@/lib/api'
@@ -313,6 +313,138 @@ function EditModal({
   )
 }
 
+// ── Milestone inline edit row ─────────────────────────────────────────────────
+function MilestoneRow({
+  m, studentId, isAdmin, onSaved,
+}: {
+  m: any
+  studentId: number
+  isAdmin: boolean
+  onSaved: (updated: any) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({
+    expected_date: m.expected_date ?? '',
+    actual_date:   m.actual_date   ?? '',
+    status:        m.status        ?? 'Pending',
+    remarks:       m.remarks       ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr]       = useState('')
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  async function handleSave() {
+    setSaving(true); setErr('')
+    try {
+      const payload: any = {
+        expected_date: form.expected_date || null,
+        actual_date:   form.actual_date   || null,
+        status:        form.status,
+        remarks:       form.remarks       || null,
+      }
+      await updateMilestone(studentId, m.milestone_id, payload)
+      onSaved({ ...m, ...payload })
+      setEditing(false)
+    } catch (e: any) {
+      setErr(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleCancel() {
+    setForm({
+      expected_date: m.expected_date ?? '',
+      actual_date:   m.actual_date   ?? '',
+      status:        m.status        ?? 'Pending',
+      remarks:       m.remarks       ?? '',
+    })
+    setErr('')
+    setEditing(false)
+  }
+
+  const fieldCls = 'border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500'
+
+  if (!editing) {
+    return (
+      <div className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+        <div className="mt-0.5">{statusIcon(m.status)}</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-medium text-gray-800">{m.name}</p>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(m.status)}`}>
+              {m.status}
+            </span>
+          </div>
+          <div className="text-xs text-gray-400 mt-0.5 flex gap-3 flex-wrap">
+            <span>Expected: {m.expected_date ?? '—'}</span>
+            {m.actual_date && <span>Actual: {m.actual_date}</span>}
+          </div>
+          {m.remarks && <p className="text-xs text-gray-500 mt-1 italic">{m.remarks}</p>}
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => setEditing(true)}
+            className="flex-shrink-0 p-1 text-gray-300 hover:text-indigo-500 transition"
+            title="Edit milestone"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="py-3 border-b border-indigo-50 last:border-0 bg-indigo-50/30 rounded-lg px-3 -mx-3">
+      <p className="text-sm font-medium text-gray-800 mb-3">{m.name}</p>
+
+      {err && <p className="text-xs text-red-600 mb-2">{err}</p>}
+
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Expected date</label>
+          <input type="date" value={form.expected_date} onChange={e => set('expected_date', e.target.value)}
+            className={`w-full ${fieldCls}`} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Actual / submission date</label>
+          <input type="date" value={form.actual_date} onChange={e => set('actual_date', e.target.value)}
+            className={`w-full ${fieldCls}`} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Status</label>
+          <select value={form.status} onChange={e => set('status', e.target.value)}
+            className={`w-full ${fieldCls} bg-white`}>
+            <option>Pending</option>
+            <option>Completed</option>
+            <option>Overdue</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Remarks</label>
+          <input value={form.remarks} onChange={e => set('remarks', e.target.value)}
+            placeholder="Optional notes…"
+            className={`w-full ${fieldCls}`} />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <button onClick={handleCancel}
+          className="px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded-md transition">
+          Cancel
+        </button>
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-1 px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-md transition">
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function StudentDetailPage() {
   const { id }  = useParams()
@@ -397,24 +529,22 @@ export default function StudentDetailPage() {
             <BookOpen className="w-4 h-4 text-indigo-600" />
             <h2 className="font-semibold text-gray-800">Milestones</h2>
           </div>
-          <div className="space-y-3">
-            {data.milestones.map((m: any, i: number) => (
-              <div key={i} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
-                <div className="mt-0.5">{statusIcon(m.status)}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-gray-800">{m.name}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(m.status)}`}>
-                      {m.status}
-                    </span>
-                  </div>
-                  <div className="text-xs text-gray-400 mt-0.5 flex gap-3">
-                    <span>Expected: {m.expected_date ?? '—'}</span>
-                    {m.actual_date && <span>Actual: {m.actual_date}</span>}
-                  </div>
-                  {m.remarks && <p className="text-xs text-gray-500 mt-1 italic">{m.remarks}</p>}
-                </div>
-              </div>
+          <div className="space-y-1">
+            {data.milestones.map((m: any) => (
+              <MilestoneRow
+                key={m.milestone_id}
+                m={m}
+                studentId={data.student_id}
+                isAdmin={isAdmin}
+                onSaved={updated =>
+                  setData((prev: any) => ({
+                    ...prev,
+                    milestones: prev.milestones.map((x: any) =>
+                      x.milestone_id === updated.milestone_id ? updated : x
+                    ),
+                  }))
+                }
+              />
             ))}
           </div>
         </div>
