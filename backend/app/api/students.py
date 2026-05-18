@@ -848,6 +848,139 @@ def update_milestone(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# PPM RECORDS — create / update
+# ══════════════════════════════════════════════════════════════════════════════
+
+class CreatePpmRequest(BaseModel):
+    ppm_year:      int
+    ppm_cycle:     int              # 1 or 2
+    result:        Optional[str]  = None   # S | US | None (pending)
+    verify_status: str            = "N"   # Y | N
+    verify_date:   Optional[date] = None
+    remarks:       Optional[str]  = None
+
+
+class UpdatePpmRequest(BaseModel):
+    result:        Optional[str]  = None
+    verify_status: Optional[str]  = None
+    verify_date:   Optional[date] = None
+    remarks:       Optional[str]  = None
+
+
+@router.post("/api/students/{student_id}/ppm")
+def create_ppm(
+    student_id: int,
+    body: CreatePpmRequest,
+    user: dict = Depends(require_admin),
+):
+    """Add a new PPM cycle for a student. Max 2 cycles per year. Admin only."""
+    if body.ppm_cycle not in (1, 2):
+        raise HTTPException(status_code=422, detail="ppm_cycle must be 1 or 2.")
+
+    db = SyncSessionLocal()
+    try:
+        # Check student exists
+        if not db.execute(text("SELECT 1 FROM student WHERE student_id = :id"),
+                          {"id": student_id}).fetchone():
+            raise HTTPException(status_code=404, detail="Student not found.")
+
+        # Enforce max 2 cycles per year
+        count = db.execute(text("""
+            SELECT COUNT(*) FROM ppm_record
+            WHERE student_id = :sid AND ppm_year = :yr
+        """), {"sid": student_id, "yr": body.ppm_year}).scalar()
+        if count >= 2:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Year {body.ppm_year} already has 2 PPM cycles."
+            )
+
+        # Check duplicate (same year+cycle)
+        dup = db.execute(text("""
+            SELECT 1 FROM ppm_record
+            WHERE student_id = :sid AND ppm_year = :yr AND ppm_cycle = :cyc
+        """), {"sid": student_id, "yr": body.ppm_year, "cyc": body.ppm_cycle}).fetchone()
+        if dup:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Year {body.ppm_year} Cycle {body.ppm_cycle} already exists."
+            )
+
+        db.execute(text("""
+            INSERT INTO ppm_record
+                (student_id, ppm_year, ppm_cycle, result, verify_status, verify_date, remarks)
+            VALUES
+                (:sid, :yr, :cyc, :result, :vs, :vd, :remarks)
+        """), {
+            "sid":     student_id,
+            "yr":      body.ppm_year,
+            "cyc":     body.ppm_cycle,
+            "result":  body.result,
+            "vs":      body.verify_status,
+            "vd":      body.verify_date,
+            "remarks": body.remarks,
+        })
+        db.commit()
+        return {"success": True, "message": "PPM record created."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.put("/api/students/{student_id}/ppm/{ppm_year}/{ppm_cycle}")
+def update_ppm(
+    student_id: int,
+    ppm_year:   int,
+    ppm_cycle:  int,
+    body: UpdatePpmRequest,
+    user: dict = Depends(require_admin),
+):
+    """Update an existing PPM record. Admin only."""
+    db = SyncSessionLocal()
+    try:
+        existing = db.execute(text("""
+            SELECT 1 FROM ppm_record
+            WHERE student_id = :sid AND ppm_year = :yr AND ppm_cycle = :cyc
+        """), {"sid": student_id, "yr": ppm_year, "cyc": ppm_cycle}).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="PPM record not found.")
+
+        fields, params = [], {"sid": student_id, "yr": ppm_year, "cyc": ppm_cycle}
+
+        if body.result is not None:
+            fields.append("result = :result"); params["result"] = body.result
+        if body.verify_status is not None:
+            fields.append("verify_status = :vs"); params["vs"] = body.verify_status
+        if body.verify_date is not None:
+            fields.append("verify_date = :vd"); params["vd"] = body.verify_date
+        if body.remarks is not None:
+            fields.append("remarks = :remarks"); params["remarks"] = body.remarks
+
+        if not fields:
+            return {"success": True, "message": "Nothing to update."}
+
+        db.execute(text(f"""
+            UPDATE ppm_record SET {', '.join(fields)}
+            WHERE student_id = :sid AND ppm_year = :yr AND ppm_cycle = :cyc
+        """), params)
+        db.commit()
+        return {"success": True, "message": "PPM record updated."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CREATE SUPERVISOR / LECTURER
 # ══════════════════════════════════════════════════════════════════════════════
 

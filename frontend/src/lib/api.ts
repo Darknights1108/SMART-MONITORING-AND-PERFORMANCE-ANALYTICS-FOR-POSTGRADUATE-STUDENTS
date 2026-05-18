@@ -102,6 +102,10 @@ export const updateStudent    = (id: number, data: any) =>
   req<any>(`/api/students/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 export const updateMilestone  = (studentId: number, milestoneId: number, data: any) =>
   req<any>(`/api/students/${studentId}/milestones/${milestoneId}`, { method: 'PUT', body: JSON.stringify(data) })
+export const createPpm        = (studentId: number, data: any) =>
+  req<any>(`/api/students/${studentId}/ppm`, { method: 'POST', body: JSON.stringify(data) })
+export const updatePpm        = (studentId: number, year: number, cycle: number, data: any) =>
+  req<any>(`/api/students/${studentId}/ppm/${year}/${cycle}`, { method: 'PUT', body: JSON.stringify(data) })
 export const createSupervisor = (data: any) =>
   req<any>('/api/supervisors/', { method: 'POST', body: JSON.stringify(data) })
 export const updateSupervisor = (id: number, data: any) =>

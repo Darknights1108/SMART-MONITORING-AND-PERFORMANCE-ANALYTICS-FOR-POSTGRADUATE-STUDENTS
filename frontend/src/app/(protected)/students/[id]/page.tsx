@@ -3,11 +3,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, User, BookOpen, AlertTriangle,
-  CheckCircle, Clock, Pencil, X, Save, Loader2,
+  CheckCircle, Clock, Pencil, X, Save, Loader2, Plus,
 } from 'lucide-react'
 import RiskBadge from '@/components/RiskBadge'
 import {
   getStudent, updateStudent, updateMilestone,
+  createPpm, updatePpm,
   getPrograms, getCountries, getDisciplines,
   getFundingTypes, getCampuses,
 } from '@/lib/api'
@@ -445,13 +446,252 @@ function MilestoneRow({
   )
 }
 
+// ── PPM result badge ──────────────────────────────────────────────────────────
+const ppmColor = (r: string | null) =>
+  r === 'US' ? 'bg-red-100 text-red-700' :
+  r === 'S'  ? 'bg-green-100 text-green-700' :
+               'bg-gray-100 text-gray-500'
+
+// ── PPM inline edit row ───────────────────────────────────────────────────────
+function PpmRow({
+  p, studentId, isAdmin, onSaved,
+}: {
+  p: any
+  studentId: number
+  isAdmin: boolean
+  onSaved: (updated: any) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [form, setForm] = useState({
+    result:        p.result        ?? '',
+    verify_status: p.verified ? 'Y' : 'N',
+    verify_date:   p.verify_date   ?? '',
+    remarks:       p.remarks       ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr]       = useState('')
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  async function handleSave() {
+    setSaving(true); setErr('')
+    try {
+      const payload = {
+        result:        form.result        || null,
+        verify_status: form.verify_status,
+        verify_date:   form.verify_date   || null,
+        remarks:       form.remarks       || null,
+      }
+      await updatePpm(studentId, p.year, p.cycle, payload)
+      onSaved({ ...p, ...payload, verified: payload.verify_status === 'Y' })
+      setEditing(false)
+    } catch (e: any) { setErr(e.message) }
+    finally { setSaving(false) }
+  }
+
+  const fieldCls = 'border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white w-full'
+
+  if (!editing) return (
+    <div className="flex items-center gap-2 text-xs py-1.5 border-b border-gray-50 last:border-0">
+      <span className="text-gray-600 flex-1">Year {p.year} · Cycle {p.cycle}</span>
+      <span className={`font-bold px-2 py-0.5 rounded-full ${ppmColor(p.result)}`}>
+        {p.result ?? '—'}
+      </span>
+      {p.verified && (
+        <span className="text-gray-400" title={`Verified ${p.verify_date ?? ''}`}>✓</span>
+      )}
+      {isAdmin && (
+        <button onClick={() => setEditing(true)}
+          className="p-0.5 text-gray-300 hover:text-indigo-500 transition" title="Edit PPM">
+          <Pencil className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="py-2 px-3 -mx-3 bg-indigo-50/30 rounded-lg border-b border-indigo-50 last:border-0 mb-1">
+      <p className="text-xs font-medium text-gray-700 mb-2">Year {p.year} · Cycle {p.cycle}</p>
+      {err && <p className="text-xs text-red-600 mb-1">{err}</p>}
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Result</label>
+          <select value={form.result} onChange={e => set('result', e.target.value)} className={fieldCls}>
+            <option value="">— Pending —</option>
+            <option value="S">S (Satisfactory)</option>
+            <option value="US">US (Unsatisfactory)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Verified</label>
+          <select value={form.verify_status} onChange={e => set('verify_status', e.target.value)} className={fieldCls}>
+            <option value="N">No</option>
+            <option value="Y">Yes</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Verify date</label>
+          <input type="date" value={form.verify_date} onChange={e => set('verify_date', e.target.value)}
+            className={fieldCls} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Remarks</label>
+          <input value={form.remarks} onChange={e => set('remarks', e.target.value)}
+            placeholder="Optional…" className={fieldCls} />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button onClick={() => { setEditing(false); setErr('') }}
+          className="px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded-md transition">
+          Cancel
+        </button>
+        <button onClick={handleSave} disabled={saving}
+          className="flex items-center gap-1 px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-md transition">
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── PPM add form ──────────────────────────────────────────────────────────────
+function PpmAddForm({
+  studentId, existingRecords, onAdded, onCancel,
+}: {
+  studentId: number
+  existingRecords: any[]
+  onAdded: (record: any) => void
+  onCancel: () => void
+}) {
+  const currentYear = new Date().getFullYear()
+  const [form, setForm] = useState({
+    ppm_year:      String(currentYear),
+    ppm_cycle:     '1',
+    result:        '',
+    verify_status: 'N',
+    verify_date:   '',
+    remarks:       '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [err, setErr]       = useState('')
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  // Check how many cycles exist for the selected year
+  const cyclesThisYear = existingRecords.filter(
+    r => r.year === Number(form.ppm_year)
+  ).length
+  const cycleFull = cyclesThisYear >= 2
+
+  // Auto-suggest next cycle for chosen year
+  const usedCycles = existingRecords
+    .filter(r => r.year === Number(form.ppm_year))
+    .map(r => r.cycle)
+  const suggestedCycle = usedCycles.includes(1) ? '2' : '1'
+
+  async function handleAdd() {
+    if (cycleFull) { setErr(`Year ${form.ppm_year} already has 2 cycles.`); return }
+    setSaving(true); setErr('')
+    try {
+      const payload = {
+        ppm_year:      Number(form.ppm_year),
+        ppm_cycle:     Number(form.ppm_cycle),
+        result:        form.result        || null,
+        verify_status: form.verify_status,
+        verify_date:   form.verify_date   || null,
+        remarks:       form.remarks       || null,
+      }
+      await createPpm(studentId, payload)
+      onAdded({
+        year:        payload.ppm_year,
+        cycle:       payload.ppm_cycle,
+        result:      payload.result,
+        verified:    payload.verify_status === 'Y',
+        verify_date: payload.verify_date,
+        remarks:     payload.remarks,
+      })
+    } catch (e: any) { setErr(e.message) }
+    finally { setSaving(false) }
+  }
+
+  const fieldCls = 'border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white w-full'
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <p className="text-xs font-medium text-gray-700 mb-2">Add PPM cycle</p>
+      {err && <p className="text-xs text-red-600 mb-2">{err}</p>}
+      <div className="grid grid-cols-2 gap-2 mb-2">
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Year</label>
+          <input type="number" min="2000" max="2099"
+            value={form.ppm_year}
+            onChange={e => {
+              set('ppm_year', e.target.value)
+              // auto-suggest cycle when year changes
+              const cycs = existingRecords.filter(r => r.year === Number(e.target.value)).map(r => r.cycle)
+              set('ppm_cycle', cycs.includes(1) ? '2' : '1')
+            }}
+            className={fieldCls} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">
+            Cycle
+            {cycleFull && <span className="ml-1 text-red-500">(year full)</span>}
+          </label>
+          <select value={form.ppm_cycle} onChange={e => set('ppm_cycle', e.target.value)} className={fieldCls}>
+            {!usedCycles.includes(1) && <option value="1">Cycle 1</option>}
+            {!usedCycles.includes(2) && <option value="2">Cycle 2</option>}
+            {cycleFull && <option value="">—</option>}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Result</label>
+          <select value={form.result} onChange={e => set('result', e.target.value)} className={fieldCls}>
+            <option value="">— Pending —</option>
+            <option value="S">S (Satisfactory)</option>
+            <option value="US">US (Unsatisfactory)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Verified</label>
+          <select value={form.verify_status} onChange={e => set('verify_status', e.target.value)} className={fieldCls}>
+            <option value="N">No</option>
+            <option value="Y">Yes</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Verify date</label>
+          <input type="date" value={form.verify_date} onChange={e => set('verify_date', e.target.value)}
+            className={fieldCls} />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Remarks</label>
+          <input value={form.remarks} onChange={e => set('remarks', e.target.value)}
+            placeholder="Optional…" className={fieldCls} />
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button onClick={onCancel}
+          className="px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded-md transition">
+          Cancel
+        </button>
+        <button onClick={handleAdd} disabled={saving || cycleFull}
+          className="flex items-center gap-1 px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-md transition">
+          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+          {saving ? 'Adding…' : 'Add'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function StudentDetailPage() {
   const { id }  = useParams()
   const router  = useRouter()
-  const [data, setData]     = useState<any>(null)
-  const [err, setErr]       = useState('')
+  const [data, setData]       = useState<any>(null)
+  const [err, setErr]         = useState('')
   const [editing, setEditing] = useState(false)
+  const [addingPpm, setAddingPpm] = useState(false)
 
   const currentUser = getUser()
   const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Both'
@@ -591,27 +831,60 @@ export default function StudentDetailPage() {
                 <User className="w-4 h-4 text-indigo-600" />
                 <h2 className="font-semibold text-gray-800">PPM Records</h2>
               </div>
-              {ppmUs > 0 && (
-                <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">
-                  {ppmUs} US
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {ppmUs > 0 && (
+                  <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">
+                    {ppmUs} US
+                  </span>
+                )}
+                {isAdmin && !addingPpm && (
+                  <button
+                    onClick={() => setAddingPpm(true)}
+                    className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2 py-1 rounded-lg transition"
+                  >
+                    <Plus className="w-3 h-3" /> Add cycle
+                  </button>
+                )}
+              </div>
             </div>
-            {data.ppm_records.length === 0 ? (
+
+            {data.ppm_records.length === 0 && !addingPpm ? (
               <p className="text-xs text-gray-400">No PPM records</p>
             ) : (
-              <div className="space-y-2">
-                {data.ppm_records.map((p: any, i: number) => (
-                  <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-gray-50 last:border-0">
-                    <span className="text-gray-600">Year {p.year} · Cycle {p.cycle}</span>
-                    <span className={`font-bold px-2 py-0.5 rounded-full ${
-                      p.result === 'US' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-                    }`}>
-                      {p.result ?? '—'}
-                    </span>
-                  </div>
+              <div>
+                {data.ppm_records.map((p: any) => (
+                  <PpmRow
+                    key={`${p.year}-${p.cycle}`}
+                    p={p}
+                    studentId={data.student_id}
+                    isAdmin={isAdmin}
+                    onSaved={updated =>
+                      setData((prev: any) => ({
+                        ...prev,
+                        ppm_records: prev.ppm_records.map((x: any) =>
+                          x.year === updated.year && x.cycle === updated.cycle ? updated : x
+                        ),
+                      }))
+                    }
+                  />
                 ))}
               </div>
+            )}
+
+            {addingPpm && (
+              <PpmAddForm
+                studentId={data.student_id}
+                existingRecords={data.ppm_records}
+                onAdded={record => {
+                  setData((prev: any) => ({
+                    ...prev,
+                    ppm_records: [...prev.ppm_records, record]
+                      .sort((a, b) => a.year !== b.year ? a.year - b.year : a.cycle - b.cycle),
+                  }))
+                  setAddingPpm(false)
+                }}
+                onCancel={() => setAddingPpm(false)}
+              />
             )}
           </div>
 
