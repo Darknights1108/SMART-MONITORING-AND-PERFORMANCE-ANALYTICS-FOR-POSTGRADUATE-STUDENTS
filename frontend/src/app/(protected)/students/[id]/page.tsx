@@ -15,6 +15,13 @@ import {
 import { getUser } from '@/lib/auth'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+function computeMilestoneStatus(expectedDate: string | null, actualDate: string | null): string {
+  if (!expectedDate) return 'Pending'
+  const today = new Date().toISOString().slice(0, 10)
+  if (actualDate) return actualDate <= expectedDate ? 'Completed' : 'Overdue'
+  return today > expectedDate ? 'Overdue' : 'Pending'
+}
+
 const statusIcon = (s: string) => {
   if (s === 'Completed') return <CheckCircle className="w-4 h-4 text-green-500" />
   if (s === 'Overdue')   return <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -327,7 +334,6 @@ function MilestoneRow({
   const [form, setForm] = useState({
     expected_date: m.expected_date ?? '',
     actual_date:   m.actual_date   ?? '',
-    status:        m.status        ?? 'Pending',
     remarks:       m.remarks       ?? '',
   })
   const [saving, setSaving] = useState(false)
@@ -341,11 +347,12 @@ function MilestoneRow({
       const payload: any = {
         expected_date: form.expected_date || null,
         actual_date:   form.actual_date   || null,
-        status:        form.status,
         remarks:       form.remarks       || null,
       }
       await updateMilestone(studentId, m.milestone_id, payload)
-      onSaved({ ...m, ...payload })
+      // Recompute status from dates so display is immediately consistent
+      const autoStatus = computeMilestoneStatus(payload.expected_date, payload.actual_date)
+      onSaved({ ...m, ...payload, status: autoStatus })
       setEditing(false)
     } catch (e: any) {
       setErr(e.message)
@@ -358,7 +365,6 @@ function MilestoneRow({
     setForm({
       expected_date: m.expected_date ?? '',
       actual_date:   m.actual_date   ?? '',
-      status:        m.status        ?? 'Pending',
       remarks:       m.remarks       ?? '',
     })
     setErr('')
@@ -414,20 +420,16 @@ function MilestoneRow({
           <input type="date" value={form.actual_date} onChange={e => set('actual_date', e.target.value)}
             className={`w-full ${fieldCls}`} />
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Status</label>
-          <select value={form.status} onChange={e => set('status', e.target.value)}
-            className={`w-full ${fieldCls} bg-white`}>
-            <option>Pending</option>
-            <option>Completed</option>
-            <option>Overdue</option>
-          </select>
-        </div>
-        <div>
+        <div className="col-span-2">
           <label className="block text-xs text-gray-500 mb-1">Remarks</label>
           <input value={form.remarks} onChange={e => set('remarks', e.target.value)}
             placeholder="Optional notes…"
             className={`w-full ${fieldCls}`} />
+        </div>
+        <div className="col-span-2">
+          <p className="text-xs text-gray-400 italic">
+            Status is auto-computed: submitted ≤ expected date → Completed · submitted late → Overdue · past deadline with no submission → Overdue · otherwise Pending.
+          </p>
         </div>
       </div>
 

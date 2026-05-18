@@ -27,6 +27,17 @@ import math
 router = APIRouter(tags=["students"])
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
+def _auto_milestone_status(expected_date, actual_date) -> str:
+    """Compute milestone status from dates. Ignores the stored status column."""
+    from datetime import date as _date
+    if expected_date is None:
+        return "Pending"
+    today = _date.today()
+    if actual_date:
+        return "Completed" if actual_date <= expected_date else "Overdue"
+    return "Overdue" if today > expected_date else "Pending"
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _is_admin(user: dict) -> bool:
@@ -227,7 +238,7 @@ def get_student(student_id: int, user: dict = Depends(get_current_user)):
                     "order":         m.milestone_order,
                     "expected_date": str(m.expected_date) if m.expected_date else None,
                     "actual_date":   str(m.actual_date)   if m.actual_date   else None,
-                    "status":        m.status,
+                    "status":        _auto_milestone_status(m.expected_date, m.actual_date),
                     "remarks":       m.remarks,
                 }
                 for m in milestones
