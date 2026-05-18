@@ -60,9 +60,6 @@ def list_all_students(degree_type: str = "", status: str = "") -> str:
                 f"{row[4]} | {row[5]} | Status: {row[6] or 'N/A'}"
             )
         text_out = "\n".join(output)
-        # Keep output under ~3000 chars to avoid filling the model context window
-        if len(text_out) > 3000:
-            text_out = text_out[:3000] + f"\n  ... (showing first entries; {len(result)} total)"
         return sanitize_tool_output(text_out)
     finally:
         db.close()
