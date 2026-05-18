@@ -101,6 +101,10 @@ def send_batch_email(filter_criteria: str, subject: str, body_template: str) -> 
         body = body_template.replace("{name}", student_name or "").replace(
             "{student_id}", str(student_id) if student_id else ""
         )
+        # Strip any remaining unresolved {placeholder} variables so they
+        # don't appear literally in the sent email (e.g. {risk_score})
+        import re as _re
+        body = _re.sub(r'\{[^}]+\}', '', body)
         _pending_sends.append({
             "type": "student",
             "student_id": student_id,
