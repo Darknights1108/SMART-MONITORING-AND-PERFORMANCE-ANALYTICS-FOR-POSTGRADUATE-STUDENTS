@@ -8,6 +8,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line,
 } from 'recharts'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Role = 'user' | 'assistant' | 'system'
@@ -334,14 +336,33 @@ export default function ChatPage() {
               <div className={`flex flex-col gap-2 ${isUser ? 'items-end' : 'items-start'} max-w-[75%]`}>
                 {/* Text bubble */}
                 {m.content && (
-                  <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                  <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     isUser
-                      ? 'bg-indigo-600 text-white rounded-tr-sm'
+                      ? 'bg-indigo-600 text-white rounded-tr-sm whitespace-pre-wrap'
                       : isSystem
-                      ? 'bg-red-50 text-red-800 border border-red-100'
+                      ? 'bg-red-50 text-red-800 border border-red-100 whitespace-pre-wrap'
                       : 'bg-white border border-gray-100 shadow-sm text-gray-800 rounded-tl-sm'
                   }`}>
-                    {m.content}
+                    {isUser || isSystem ? m.content : (
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          table: (p) => <table className="text-xs border-collapse w-full my-2" {...p} />,
+                          thead: (p) => <thead className="bg-gray-50" {...p} />,
+                          th: (p) => <th className="border border-gray-200 px-2 py-1 text-left font-semibold" {...p} />,
+                          td: (p) => <td className="border border-gray-200 px-2 py-1" {...p} />,
+                          p:  (p) => <p className="mb-1 last:mb-0" {...p} />,
+                          ul: (p) => <ul className="list-disc pl-4 mb-1 space-y-0.5" {...p} />,
+                          ol: (p) => <ol className="list-decimal pl-4 mb-1 space-y-0.5" {...p} />,
+                          li: (p) => <li className="leading-snug" {...p} />,
+                          strong: (p) => <strong className="font-semibold" {...p} />,
+                          code: (p) => <code className="bg-gray-100 rounded px-1 text-xs font-mono" {...p} />,
+                          pre: (p) => <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto my-1" {...p} />,
+                        }}
+                      >
+                        {m.content}
+                      </ReactMarkdown>
+                    )}
                   </div>
                 )}
 
