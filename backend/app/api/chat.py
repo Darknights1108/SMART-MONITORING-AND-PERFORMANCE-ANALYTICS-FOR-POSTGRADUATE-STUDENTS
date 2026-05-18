@@ -26,6 +26,20 @@ _CANCEL_WORDS  = {"n", "no", "cancel", "取消", "不", "算了", "discard"}
 _EMAIL_RE      = re.compile(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}')
 _SEND_INTENT_RE = re.compile(r'\b(send|email|邮件|发送|发邮件)\b', re.IGNORECASE)
 
+# ── Context-overflow detection (triggers auto-fallback to MiMo) ───────────────
+_OVERFLOW_RE = re.compile(
+    r"context.{0,30}(length|window|exceed|overflow|limit)"
+    r"|token.{0,20}(limit|exceed|overflow)"
+    r"|exceed.{0,20}(context|token)"
+    r"|'NoneType'\s+object\s+is\s+not\s+(subscriptable|iterable)"
+    r"|NoneType.{0,30}(subscriptable|iterable)"
+    r"|llama\s+runner\s+process\s+no\s+longer",
+    re.I,
+)
+
+def _is_overflow_error(text: str) -> bool:
+    return bool(_OVERFLOW_RE.search(text))
+
 # ── Chart intent detection ─────────────────────────────────────────────────────
 # Maps regex patterns to (chart_type, data_source)
 _CHART_SOURCES = [
@@ -406,12 +420,67 @@ async def chat_websocket(websocket: WebSocket):
                 })
 
             except Exception as e:
-                error_msg = f"Agent error: {str(e)}"
+                error_text = str(e)
                 traceback.print_exc()
-                await websocket.send_json({
-                    "type": "error",
-                    "message": error_msg,
-                })
+
+                # ── Auto-fallback: Qwen context overflow → retry with MiMo ──
+                if current_model == "local" and _is_overflow_error(error_text):
+                    print(f"[OVERFLOW FALLBACK] context overflow detected, switching to MiMo", flush=True)
+                    current_model = "external"
+                    agent = get_agent(use_external=True)
+                    _first_message = True
+
+                    # Tell frontend to update the model toggle
+                    await websocket.send_json({
+                        "type": "model_switched",
+                        "model": "external",
+                        "timestamp": datetime.now().isoformat(),
+                    })
+                    # Show user a brief notice
+                    await websocket.send_json({
+                        "type": "message",
+                        "message": "⚡ Qwen 上下文已满，已自动切换至 MiMo，重新处理中…",
+                        "timestamp": datetime.now().isoformat(),
+                    })
+                    await websocket.send_json({"type": "thinking"})
+
+                    try:
+                        fallback_response = await asyncio.to_thread(
+                            agent.run, user_message, reset=True,
+                        )
+                        fallback_str = str(fallback_response)
+
+                        fallback_type = "message"
+                        try:
+                            parsed = json.loads(fallback_str)
+                            if isinstance(parsed, dict) and parsed.get("__chart_action__"):
+                                fallback_type = "chart_action"
+                            elif isinstance(parsed, dict) and parsed.get("__nav_action__"):
+                                fallback_type = "nav_action"
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
+                        db.execute(text("""
+                            INSERT INTO chat_history (supervisor_id, session_id, message, role)
+                            VALUES (:sid, :sess, :msg, 'assistant')
+                        """), {"sid": supervisor_id, "sess": session_id, "msg": fallback_str})
+                        db.commit()
+
+                        await websocket.send_json({
+                            "type": fallback_type,
+                            "message": fallback_str,
+                            "timestamp": datetime.now().isoformat(),
+                        })
+                    except Exception as e2:
+                        await websocket.send_json({
+                            "type": "error",
+                            "message": f"MiMo fallback error: {e2}",
+                        })
+                else:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Agent error: {error_text}",
+                    })
 
     except WebSocketDisconnect:
         print(f"[CHAT] User {user['staff_id']} disconnected")

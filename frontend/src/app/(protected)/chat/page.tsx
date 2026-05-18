@@ -181,7 +181,10 @@ export default function ChatPage() {
       const data = JSON.parse(e.data)
 
       if (data.type === 'auth_success')  { setConnected(true); return }
-      if (data.type === 'model_switched') { return }
+      if (data.type === 'model_switched') {
+        setModel(data.model === 'external' ? 'external' : 'local')
+        return
+      }
       if (data.type === 'thinking')     { setThinking(true); setSteps([]); return }
 
       if (['agent_thinking', 'tool_call', 'tool_result'].includes(data.type)) {

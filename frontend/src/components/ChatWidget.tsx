@@ -294,7 +294,10 @@ export default function ChatWidget() {
 
       if (data.type === 'auth_success') { setConnected(true); return }
       if (data.type === 'thinking')     { setThinking(true);  return }
-      if (data.type === 'model_switched') { return }
+      if (data.type === 'model_switched') {
+        setModel(data.model === 'external' ? 'external' : 'local')
+        return
+      }
       if (['agent_thinking', 'tool_call', 'tool_result'].includes(data.type)) return
 
       if (data.type === 'push_alert') {
