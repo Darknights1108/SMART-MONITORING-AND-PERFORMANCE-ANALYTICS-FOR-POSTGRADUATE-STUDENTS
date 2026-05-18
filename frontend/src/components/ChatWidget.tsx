@@ -49,25 +49,35 @@ const INITIAL: Message[] = [
 ]
 
 // ── Chart renderer ─────────────────────────────────────────────────────────────
+function NoData({ title }: { title: string }) {
+  return (
+    <div className="w-full text-center py-4">
+      <p className="text-[10px] font-semibold text-gray-500 mb-2 uppercase tracking-wide">{title}</p>
+      <p className="text-[11px] text-gray-400 italic">No data available</p>
+    </div>
+  )
+}
+
 function InlineChart({ spec }: { spec: ChartSpec }) {
   const colors = spec.colors ?? DEFAULT_COLORS
 
-  if (spec.type === 'pie' && spec.data) {
+  if (spec.type === 'pie') {
+    if (!spec.data || spec.data.length === 0) return <NoData title={spec.title} />
     return (
       <div className="w-full">
         <p className="text-[10px] font-semibold text-gray-500 mb-1 text-center uppercase tracking-wide">
           {spec.title}
         </p>
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={200}>
           <PieChart>
             <Pie
               data={spec.data}
               dataKey="value"
               nameKey="name"
               cx="50%"
-              cy="50%"
-              outerRadius={65}
-              label={({ name, percent }) =>
+              cy="45%"
+              outerRadius={70}
+              label={({ percent }) =>
                 percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''
               }
               labelLine={false}
@@ -76,7 +86,7 @@ function InlineChart({ spec }: { spec: ChartSpec }) {
                 <Cell key={i} fill={colors[i % colors.length]} />
               ))}
             </Pie>
-            <Tooltip formatter={(v: number) => [v, '']} />
+            <Tooltip formatter={(v: number, name: string) => [v, name]} />
             <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
           </PieChart>
         </ResponsiveContainer>
@@ -84,7 +94,8 @@ function InlineChart({ spec }: { spec: ChartSpec }) {
     )
   }
 
-  if (spec.type === 'bar' && spec.categories && spec.values) {
+  if (spec.type === 'bar') {
+    if (!spec.categories || spec.categories.length === 0) return <NoData title={spec.title} />
     const data = spec.categories.map((c, i) => ({ name: c, value: spec.values![i] }))
     return (
       <div className="w-full">
@@ -150,7 +161,8 @@ function InlineChart({ spec }: { spec: ChartSpec }) {
     )
   }
 
-  if (spec.type === 'line' && spec.categories && spec.values) {
+  if (spec.type === 'line') {
+    if (!spec.categories || spec.categories.length === 0) return <NoData title={spec.title} />
     const data = spec.categories.map((c, i) => ({ name: c, value: spec.values![i] }))
     return (
       <div className="w-full">
@@ -185,7 +197,8 @@ function MessageBubble({ m, isExpanded }: { m: Message; isExpanded: boolean }) {
   const isUser   = m.role === 'user'
   const isSystem = m.role === 'system'
   const hasCharts = m.charts && m.charts.length > 0
-  const bubbleW  = isExpanded ? 'max-w-[90%]' : 'max-w-[85%]'
+  // Chart messages get full-width; text messages are capped
+  const bubbleW  = hasCharts ? 'w-full' : isExpanded ? 'max-w-[90%]' : 'max-w-[85%]'
 
   return (
     <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -201,7 +214,7 @@ function MessageBubble({ m, isExpanded }: { m: Message; isExpanded: boolean }) {
       </div>
 
       {/* Bubble */}
-      <div className={`${bubbleW} flex flex-col gap-2`}>
+      <div className={`${bubbleW} flex flex-col gap-2 min-w-0`}>
         {/* Text content (skip if empty for chart-only messages) */}
         {m.content && (
           <div className={`rounded-2xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
@@ -237,6 +250,7 @@ export default function ChatWidget() {
   const [thinking, setThinking]   = useState(false)
   const [connected, setConnected] = useState(false)
   const [unread, setUnread]       = useState(0)
+  const [model, setModel]         = useState<'local' | 'external'>('local')
 
   const ws     = useRef<WebSocket | null>(null)
   const endRef  = useRef<HTMLDivElement>(null)
@@ -253,13 +267,14 @@ export default function ChatWidget() {
     const socket = new WebSocket(wsUrl())
     ws.current = socket
 
-    socket.onopen = () => socket.send(JSON.stringify({ token }))
+    socket.onopen = () => socket.send(JSON.stringify({ token, model }))
 
     socket.onmessage = (e) => {
       const data = JSON.parse(e.data)
 
       if (data.type === 'auth_success') { setConnected(true); return }
       if (data.type === 'thinking')     { setThinking(true);  return }
+      if (data.type === 'model_switched') { return }
       if (['agent_thinking', 'tool_call', 'tool_result'].includes(data.type)) return
 
       if (data.type === 'push_alert') {
@@ -327,6 +342,15 @@ export default function ChatWidget() {
   useEffect(() => { if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, thinking, open])
   useEffect(() => { if (open) setUnread(0) }, [open])
 
+  // ── Model switch ─────────────────────────────────────────────────────────────
+  function handleModelSwitch(m: 'local' | 'external') {
+    if (m === model) return
+    setModel(m)
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ type: 'switch_model', model: m }))
+    }
+  }
+
   // ── Send ─────────────────────────────────────────────────────────────────────
   function handleSend() {
     const msg = input.trim()
@@ -363,6 +387,25 @@ export default function ChatWidget() {
               </p>
             </div>
             <div className="flex items-center gap-1">
+              {/* Model toggle */}
+              <div className="flex items-center bg-white/10 rounded-lg p-0.5 mr-1">
+                <button
+                  onClick={() => handleModelSwitch('local')}
+                  title="Local model (Qwen3)"
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition ${
+                    model === 'local' ? 'bg-white text-indigo-700' : 'text-indigo-200 hover:text-white'
+                  }`}>
+                  Local
+                </button>
+                <button
+                  onClick={() => handleModelSwitch('external')}
+                  title="MiMo-v2-Omni"
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-semibold transition ${
+                    model === 'external' ? 'bg-white text-indigo-700' : 'text-indigo-200 hover:text-white'
+                  }`}>
+                  MiMo
+                </button>
+              </div>
               <Link href="/chat" title="Open full chat"
                 className="p-1 rounded-lg hover:bg-white/10 transition" onClick={() => setOpen(false)}>
                 <ExternalLink className="w-3.5 h-3.5" />

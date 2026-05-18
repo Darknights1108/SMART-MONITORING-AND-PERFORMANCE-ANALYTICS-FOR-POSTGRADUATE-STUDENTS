@@ -53,39 +53,48 @@ _CHART_TYPE_MAP = [
 ]
 
 
+def _detect_chart_type(segment: str, default: str = 'bar') -> str:
+    """Pick chart type from a text segment."""
+    for pattern, ctype in _CHART_TYPE_MAP:
+        if pattern.search(segment):
+            return ctype
+    return default
+
+
 def _detect_chart_intent(message: str) -> list[dict] | None:
     """
     Return a list of chart specs if the message is clearly a chart request,
     otherwise None (hand off to the agent).
+
+    Handles multi-chart messages like "RPD in pie and publication in bar"
+    by splitting on 'and'/',' and detecting type per segment.
     """
     if not _CHART_TRIGGER.search(message):
         return None
 
-    # Determine chart type (default: bar)
-    chart_type = 'bar'
-    for pattern, ctype in _CHART_TYPE_MAP:
-        if pattern.search(message):
-            chart_type = ctype
-            break
+    # Split into segments so each source+type pair can be detected independently
+    # e.g. "show RPD in pie and publication in bar" → ["show RPD in pie", "publication in bar"]
+    segments = re.split(r'\band\b|[,、]', message, flags=re.I)
 
-    # Find matching data sources
-    specs = []
-    for pattern, source in _CHART_SOURCES:
-        if pattern.search(message):
-            specs.append({"type": chart_type, "data_source": source})
+    # Global fallback type (from full message, used for single-segment messages)
+    global_type = _detect_chart_type(message)
 
-    # Multi-source: allow per-segment type override
-    # e.g. "RPD in pie and publication in bar"
-    if len(specs) > 1:
-        refined = []
-        for spec in specs:
-            seg_type = chart_type
-            for pattern, ctype in _CHART_TYPE_MAP:
-                if pattern.search(message):
-                    seg_type = ctype
-                    break
-            refined.append({**spec, "type": seg_type})
-        specs = refined
+    specs: list[dict] = []
+    seen_sources: set[str] = set()
+
+    for seg in segments:
+        seg = seg.strip()
+        seg_type = _detect_chart_type(seg, default=global_type)
+        for pattern, source in _CHART_SOURCES:
+            if source not in seen_sources and pattern.search(seg):
+                specs.append({"type": seg_type, "data_source": source})
+                seen_sources.add(source)
+
+    # Fallback: scan full message if no segments matched
+    if not specs:
+        for pattern, source in _CHART_SOURCES:
+            if pattern.search(message):
+                specs.append({"type": global_type, "data_source": source})
 
     return specs if specs else None
 
@@ -175,7 +184,9 @@ async def chat_websocket(websocket: WebSocket):
 
     # Each connection gets its own agent — enables true multi-turn memory
     # via reset=False without sharing state across users.
-    agent = get_agent()
+    use_external = auth_data.get("model") == "external"
+    agent = get_agent(use_external=use_external)
+    current_model = "external" if use_external else "local"
     db = SyncSessionLocal()
     _first_message = True   # track whether to use reset=True on first call
 
@@ -184,6 +195,20 @@ async def chat_websocket(websocket: WebSocket):
             data = await websocket.receive_text()
             msg_data = json.loads(data)
             user_message = msg_data.get("message", "")
+
+            # Model switch request (no message needed)
+            if msg_data.get("type") == "switch_model":
+                new_model = msg_data.get("model", "local")
+                if new_model != current_model:
+                    current_model = new_model
+                    agent = get_agent(use_external=(current_model == "external"))
+                    _first_message = True   # fresh context for new model
+                await websocket.send_json({
+                    "type": "model_switched",
+                    "model": current_model,
+                    "timestamp": datetime.now().isoformat(),
+                })
+                continue
 
             if not user_message.strip():
                 continue
@@ -234,6 +259,7 @@ async def chat_websocket(websocket: WebSocket):
             # ── Fast-path: chart requests bypass the LLM entirely ─────────────
             chart_specs = _detect_chart_intent(user_message)
             if chart_specs:
+                print(f"[CHART FAST-PATH] specs={chart_specs}", flush=True)
                 await websocket.send_json({"type": "thinking"})
                 try:
                     result_str = await asyncio.to_thread(
@@ -241,6 +267,7 @@ async def chat_websocket(websocket: WebSocket):
                     )
                     payload = json.loads(result_str)
                     if payload.get("__chart_action__"):
+                        print(f"[CHART FAST-PATH] sending chart_action, charts={len(payload.get('charts',[]))}", flush=True)
                         await websocket.send_json({
                             "type": "chart_action",
                             "message": result_str,

@@ -150,6 +150,7 @@ export default function ChatPage() {
   const [thinking, setThinking]   = useState(false)
   const [showSteps, setShowSteps] = useState(false)
   const [connected, setConnected] = useState(false)
+  const [model, setModel]         = useState<'local' | 'external'>('local')
 
   const ws    = useRef<WebSocket | null>(null)
   const end   = useRef<HTMLDivElement>(null)
@@ -158,18 +159,27 @@ export default function ChatPage() {
   useEffect(() => { end.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, thinking])
   useEffect(() => { connect(); return () => ws.current?.close() }, [])
 
+  function handleModelSwitch(m: 'local' | 'external') {
+    if (m === model) return
+    setModel(m)
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ type: 'switch_model', model: m }))
+    }
+  }
+
   function connect() {
     const token = getToken()
     if (!token) return
     const socket = new WebSocket(wsUrl())
     ws.current = socket
 
-    socket.onopen = () => socket.send(JSON.stringify({ token }))
+    socket.onopen = () => socket.send(JSON.stringify({ token, model }))
 
     socket.onmessage = (e) => {
       const data = JSON.parse(e.data)
 
-      if (data.type === 'auth_success') { setConnected(true); return }
+      if (data.type === 'auth_success')  { setConnected(true); return }
+      if (data.type === 'model_switched') { return }
       if (data.type === 'thinking')     { setThinking(true); setSteps([]); return }
 
       if (['agent_thinking', 'tool_call', 'tool_result'].includes(data.type)) {
@@ -263,13 +273,32 @@ export default function ChatPage() {
             {connected ? 'Connected' : 'Connecting…'}
           </p>
         </div>
-        {steps.length > 0 && (
-          <button onClick={() => setShowSteps(v => !v)}
-            className="flex items-center gap-1 text-xs text-indigo-600 border border-indigo-200 rounded-lg px-3 py-1.5 hover:bg-indigo-50">
-            Agent steps ({steps.length})
-            <ChevronDown className={`w-3 h-3 transition-transform ${showSteps ? 'rotate-180' : ''}`} />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Model toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            {(['local', 'external'] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => handleModelSwitch(m)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition ${
+                  model === m
+                    ? 'bg-white shadow text-indigo-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {m === 'local' ? 'Local' : 'MiMo'}
+              </button>
+            ))}
+          </div>
+
+          {steps.length > 0 && (
+            <button onClick={() => setShowSteps(v => !v)}
+              className="flex items-center gap-1 text-xs text-indigo-600 border border-indigo-200 rounded-lg px-3 py-1.5 hover:bg-indigo-50">
+              Agent steps ({steps.length})
+              <ChevronDown className={`w-3 h-3 transition-transform ${showSteps ? 'rotate-180' : ''}`} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Steps panel */}

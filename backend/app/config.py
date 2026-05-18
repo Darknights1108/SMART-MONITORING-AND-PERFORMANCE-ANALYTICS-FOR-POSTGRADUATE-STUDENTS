@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "DataTrain Postgraduate System"
     SMTP_FROM_EMAIL: str = ""
 
+    # External AI Model (e.g. MiMo-v2-Omni)
+    EXTERNAL_MODEL_API_KEY: str = ""
+    EXTERNAL_MODEL_BASE_URL: str = "https://api.mimo.ai/v1"
+    EXTERNAL_MODEL_NAME: str = "mimo-v2-omni"
+
     # Scheduler
     REMINDER_CHECK_HOUR: int = 8  # Run daily at 8 AM
     REMINDER_CHECK_MINUTE: int = 0

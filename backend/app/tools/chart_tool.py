@@ -136,10 +136,10 @@ def _fetch(db, chart_type: str, source: str) -> dict | None:
             "title": "Milestone Completion Status",
             "categories": [r[0] for r in rows],
             "series": [
-                {"name": "On Time",  "data": [r[1] for r in rows], "color": "#22c55e"},
-                {"name": "Late",     "data": [r[2] for r in rows], "color": "#f59e0b"},
-                {"name": "Pending",  "data": [r[3] for r in rows], "color": "#94a3b8"},
-                {"name": "Overdue",  "data": [r[4] for r in rows], "color": "#ef4444"},
+                {"name": "On Time",  "data": [int(r[1]) for r in rows], "color": "#22c55e"},
+                {"name": "Late",     "data": [int(r[2]) for r in rows], "color": "#f59e0b"},
+                {"name": "Pending",  "data": [int(r[3]) for r in rows], "color": "#94a3b8"},
+                {"name": "Overdue",  "data": [int(r[4]) for r in rows], "color": "#ef4444"},
             ],
         }
 
@@ -154,7 +154,7 @@ def _fetch(db, chart_type: str, source: str) -> dict | None:
             "type": "line",
             "title": "Monthly Enrollment Trend",
             "categories": [r[0] for r in rows],
-            "values":     [r[1] for r in rows],
+            "values":     [int(r[1]) for r in rows],
         }
 
     if source == "faculty":
