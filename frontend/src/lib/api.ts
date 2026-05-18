@@ -98,6 +98,8 @@ export const getCampuses     = () => req<any[]>('/api/lookups/campuses')
 // ── Admin — Create ────────────────────────────────────────────────────────────
 export const createStudent    = (data: any) =>
   req<any>('/api/students/',    { method: 'POST', body: JSON.stringify(data) })
+export const updateStudent    = (id: number, data: any) =>
+  req<any>(`/api/students/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 export const createSupervisor = (data: any) =>
   req<any>('/api/supervisors/', { method: 'POST', body: JSON.stringify(data) })
 export const updateSupervisor = (id: number, data: any) =>

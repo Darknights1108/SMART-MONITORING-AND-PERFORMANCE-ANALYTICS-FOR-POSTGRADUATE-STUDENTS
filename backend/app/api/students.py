@@ -667,6 +667,119 @@ def create_student(body: CreateStudentRequest, user: dict = Depends(require_admi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# UPDATE STUDENT
+# ══════════════════════════════════════════════════════════════════════════════
+
+class UpdateStudentRequest(BaseModel):
+    student_name:       Optional[str]   = None
+    email:              Optional[str]   = None
+    gender:             Optional[str]   = None
+    date_of_birth:      Optional[date]  = None
+    country_id:         Optional[int]   = None
+    marital_status:     Optional[str]   = None
+    num_children:       Optional[int]   = None
+    program_id:         Optional[int]   = None
+    degree_type:        Optional[str]   = None
+    study_method:       Optional[str]   = None
+    enrollment_date:    Optional[date]  = None
+    entry_gpa:          Optional[float] = None
+    is_cross_discipline: Optional[bool] = None
+    discipline_id:      Optional[int]   = None
+    campus_id:          Optional[int]   = None
+    funding_id:         Optional[int]   = None
+    has_external_work:  Optional[bool]  = None
+    weekly_work_hours:  Optional[float] = None
+    in_research_group:  Optional[bool]  = None
+    family_support:     Optional[int]   = None
+    program_status:     Optional[str]   = None
+
+
+@router.put("/api/students/{student_id}")
+def update_student(
+    student_id: int,
+    body: UpdateStudentRequest,
+    user: dict = Depends(require_admin),
+):
+    """Update student profile fields. Admin only."""
+    db = SyncSessionLocal()
+    try:
+        existing = db.execute(
+            text("SELECT student_id FROM student WHERE student_id = :id"),
+            {"id": student_id},
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Student not found.")
+
+        fields, params = [], {"id": student_id}
+
+        _map = {
+            "student_name":        ("student_name",        body.student_name),
+            "gender":              ("gender",               body.gender),
+            "marital_status":      ("marital_status",       body.marital_status),
+            "degree_type":         ("degree_type",          body.degree_type),
+            "study_method":        ("study_method",         body.study_method),
+            "program_status":      ("program_status",       body.program_status),
+        }
+        for key, (col, val) in _map.items():
+            if val is not None:
+                fields.append(f"{col} = :{key}"); params[key] = val
+
+        _int_map = {
+            "country_id":   body.country_id,
+            "num_children": body.num_children,
+            "program_id":   body.program_id,
+            "discipline_id": body.discipline_id,
+            "campus_id":    body.campus_id,
+            "funding_id":   body.funding_id,
+            "family_support": body.family_support,
+        }
+        for col, val in _int_map.items():
+            if val is not None:
+                fields.append(f"{col} = :{col}"); params[col] = val
+
+        if body.email is not None:
+            dup = db.execute(text(
+                "SELECT 1 FROM student WHERE email = :email AND student_id != :id"
+            ), {"email": body.email, "id": student_id}).fetchone()
+            if dup:
+                raise HTTPException(status_code=409, detail=f"Email '{body.email}' already in use.")
+            fields.append("email = :email"); params["email"] = body.email
+
+        if body.date_of_birth is not None:
+            fields.append("date_of_birth = :dob"); params["dob"] = body.date_of_birth
+        if body.enrollment_date is not None:
+            fields.append("enrollment_date = :enrollment_date"); params["enrollment_date"] = body.enrollment_date
+        if body.entry_gpa is not None:
+            fields.append("entry_gpa = :entry_gpa"); params["entry_gpa"] = body.entry_gpa
+        if body.is_cross_discipline is not None:
+            fields.append("is_cross_discipline = :cross"); params["cross"] = int(body.is_cross_discipline)
+        if body.has_external_work is not None:
+            fields.append("has_external_work = :ext_work"); params["ext_work"] = int(body.has_external_work)
+        if body.weekly_work_hours is not None:
+            fields.append("weekly_work_hours = :wh"); params["wh"] = body.weekly_work_hours
+        if body.in_research_group is not None:
+            fields.append("in_research_group = :rg"); params["rg"] = int(body.in_research_group)
+
+        if not fields:
+            return {"success": True, "message": "Nothing to update."}
+
+        db.execute(
+            text(f"UPDATE student SET {', '.join(fields)} WHERE student_id = :id"),
+            params,
+        )
+        db.commit()
+        return {"success": True, "message": "Student updated."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CREATE SUPERVISOR / LECTURER
 # ══════════════════════════════════════════════════════════════════════════════
 

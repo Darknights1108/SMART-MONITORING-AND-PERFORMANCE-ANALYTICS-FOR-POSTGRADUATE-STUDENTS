@@ -1,10 +1,19 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, User, BookOpen, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
+import {
+  ArrowLeft, User, BookOpen, AlertTriangle,
+  CheckCircle, Clock, Pencil, X, Save, Loader2,
+} from 'lucide-react'
 import RiskBadge from '@/components/RiskBadge'
-import { getStudent } from '@/lib/api'
+import {
+  getStudent, updateStudent,
+  getPrograms, getCountries, getDisciplines,
+  getFundingTypes, getCampuses,
+} from '@/lib/api'
+import { getUser } from '@/lib/auth'
 
+// ── helpers ───────────────────────────────────────────────────────────────────
 const statusIcon = (s: string) => {
   if (s === 'Completed') return <CheckCircle className="w-4 h-4 text-green-500" />
   if (s === 'Overdue')   return <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -15,11 +24,305 @@ const statusColor = (s: string) =>
   s === 'Overdue'   ? 'bg-red-100 text-red-700'     :
                       'bg-amber-100 text-amber-700'
 
+// ── Edit Modal ────────────────────────────────────────────────────────────────
+function EditModal({
+  data, onClose, onSaved,
+}: {
+  data: any
+  onClose: () => void
+  onSaved: (updated: any) => void
+}) {
+  const [form, setForm] = useState({
+    student_name:       data.student_name       ?? '',
+    email:              data.email              ?? '',
+    gender:             data.gender             ?? '',
+    date_of_birth:      data.date_of_birth      ?? '',
+    country_id:         data.country_id         ?? '',
+    marital_status:     data.marital_status     ?? '',
+    num_children:       data.num_children       ?? 0,
+    program_id:         data.program_id         ?? '',
+    degree_type:        data.degree_type        ?? 'Master',
+    study_method:       data.study_method       ?? 'Full-time',
+    enrollment_date:    data.enrollment_date    ?? '',
+    entry_gpa:          data.entry_gpa          ?? '',
+    is_cross_discipline: data.is_cross_discipline ?? false,
+    discipline_id:      data.discipline_id      ?? '',
+    campus_id:          data.campus_id          ?? '',
+    funding_id:         data.funding_id         ?? '',
+    has_external_work:  data.has_external_work  ?? false,
+    weekly_work_hours:  data.weekly_work_hours  ?? 0,
+    in_research_group:  data.in_research_group  ?? false,
+    family_support:     data.family_support     ?? '',
+    program_status:     data.program_status     ?? 'Active in Program',
+  })
+  const [lookups, setLookups] = useState<any>({
+    programs: [], countries: [], disciplines: [], funding: [], campuses: [],
+  })
+  const [saving, setSaving]   = useState(false)
+  const [error, setError]     = useState('')
+  const [tab, setTab]         = useState<'personal' | 'academic' | 'other'>('personal')
+
+  useEffect(() => {
+    Promise.all([getPrograms(), getCountries(), getDisciplines(), getFundingTypes(), getCampuses()])
+      .then(([programs, countries, disciplines, funding, campuses]) =>
+        setLookups({ programs, countries, disciplines, funding, campuses })
+      )
+      .catch(() => {})
+  }, [])
+
+  const set = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
+
+  async function handleSave() {
+    setSaving(true); setError('')
+    try {
+      const payload: any = {
+        student_name:       form.student_name      || undefined,
+        email:              form.email             || undefined,
+        gender:             form.gender            || undefined,
+        date_of_birth:      form.date_of_birth     || undefined,
+        country_id:         form.country_id        ? Number(form.country_id) : undefined,
+        marital_status:     form.marital_status    || undefined,
+        num_children:       Number(form.num_children),
+        program_id:         form.program_id        ? Number(form.program_id) : undefined,
+        degree_type:        form.degree_type       || undefined,
+        study_method:       form.study_method      || undefined,
+        enrollment_date:    form.enrollment_date   || undefined,
+        entry_gpa:          form.entry_gpa !== ''  ? Number(form.entry_gpa) : undefined,
+        is_cross_discipline: form.is_cross_discipline,
+        discipline_id:      form.discipline_id     ? Number(form.discipline_id) : undefined,
+        campus_id:          form.campus_id         ? Number(form.campus_id) : undefined,
+        funding_id:         form.funding_id        ? Number(form.funding_id) : undefined,
+        has_external_work:  form.has_external_work,
+        weekly_work_hours:  Number(form.weekly_work_hours),
+        in_research_group:  form.in_research_group,
+        family_support:     form.family_support !== '' ? Number(form.family_support) : undefined,
+        program_status:     form.program_status    || undefined,
+      }
+      await updateStudent(data.student_id, payload)
+      // Find updated program name for display
+      const prog = lookups.programs.find((p: any) => p.id === payload.program_id)
+      onSaved({
+        ...data,
+        ...payload,
+        program_full: prog?.full ?? data.program_full,
+        program:      prog?.short ?? data.program,
+      })
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const tabCls = (t: string) =>
+    `px-4 py-2 text-sm font-medium border-b-2 transition ${
+      tab === t
+        ? 'border-indigo-600 text-indigo-600'
+        : 'border-transparent text-gray-500 hover:text-gray-700'
+    }`
+
+  const fieldCls = 'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500'
+  const labelCls = 'block text-xs font-medium text-gray-600 mb-1'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Edit Student</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{data.student_id_number}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-100 px-6 flex-shrink-0">
+          <button className={tabCls('personal')} onClick={() => setTab('personal')}>Personal</button>
+          <button className={tabCls('academic')} onClick={() => setTab('academic')}>Academic</button>
+          <button className={tabCls('other')}    onClick={() => setTab('other')}>Financial & Social</button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 overflow-y-auto flex-1">
+          {error && (
+            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4">
+              {error}
+            </p>
+          )}
+
+          {tab === 'personal' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className={labelCls}>Full Name</label>
+                <input value={form.student_name} onChange={e => set('student_name', e.target.value)} className={fieldCls} />
+              </div>
+              <div className="col-span-2">
+                <label className={labelCls}>Email</label>
+                <input type="email" value={form.email} onChange={e => set('email', e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Gender</label>
+                <select value={form.gender} onChange={e => set('gender', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option value="">— Select —</option>
+                  <option>Male</option><option>Female</option><option>Other</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Date of Birth</label>
+                <input type="date" value={form.date_of_birth} onChange={e => set('date_of_birth', e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Country</label>
+                <select value={form.country_id} onChange={e => set('country_id', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option value="">— Select —</option>
+                  {lookups.countries.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Marital Status</label>
+                <select value={form.marital_status} onChange={e => set('marital_status', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option value="">— Select —</option>
+                  <option>Single</option><option>Married</option>
+                  <option>Divorced</option><option>Widowed</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Number of Children</label>
+                <input type="number" min="0" value={form.num_children} onChange={e => set('num_children', e.target.value)} className={fieldCls} />
+              </div>
+            </div>
+          )}
+
+          {tab === 'academic' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <label className={labelCls}>Program</label>
+                <select value={form.program_id} onChange={e => set('program_id', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option value="">— Select —</option>
+                  {lookups.programs.map((p: any) => <option key={p.id} value={p.id}>{p.short} — {p.full}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Degree Type</label>
+                <select value={form.degree_type} onChange={e => set('degree_type', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option>Master</option><option>PhD</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Study Mode</label>
+                <select value={form.study_method} onChange={e => set('study_method', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option>Full-time</option><option>Part-time</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Enrollment Date</label>
+                <input type="date" value={form.enrollment_date} onChange={e => set('enrollment_date', e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Entry GPA</label>
+                <input type="number" step="0.01" min="0" max="4" value={form.entry_gpa} onChange={e => set('entry_gpa', e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Campus</label>
+                <select value={form.campus_id} onChange={e => set('campus_id', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option value="">— Select —</option>
+                  {lookups.campuses.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Discipline</label>
+                <select value={form.discipline_id} onChange={e => set('discipline_id', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option value="">— Select —</option>
+                  {lookups.disciplines.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Program Status</label>
+                <select value={form.program_status} onChange={e => set('program_status', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option>Active in Program</option>
+                  <option>Graduated On-time</option>
+                  <option>Graduated Delayed</option>
+                  <option>Dropped Out</option>
+                  <option>Withdrawn</option>
+                </select>
+              </div>
+              <div className="col-span-2 flex items-center gap-2 pt-1">
+                <input type="checkbox" id="cross_disc" checked={form.is_cross_discipline}
+                  onChange={e => set('is_cross_discipline', e.target.checked)}
+                  className="w-4 h-4 accent-indigo-600" />
+                <label htmlFor="cross_disc" className="text-sm text-gray-700">Cross-discipline student</label>
+              </div>
+            </div>
+          )}
+
+          {tab === 'other' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Funding Type</label>
+                <select value={form.funding_id} onChange={e => set('funding_id', e.target.value)} className={`${fieldCls} bg-white`}>
+                  <option value="">— Select —</option>
+                  {lookups.funding.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Family Support <span className="text-gray-400 font-normal">(1–5)</span></label>
+                <input type="number" min="1" max="5" value={form.family_support}
+                  onChange={e => set('family_support', e.target.value)} className={fieldCls} />
+              </div>
+              <div className="col-span-2 flex items-center gap-2">
+                <input type="checkbox" id="ext_work" checked={form.has_external_work}
+                  onChange={e => set('has_external_work', e.target.checked)}
+                  className="w-4 h-4 accent-indigo-600" />
+                <label htmlFor="ext_work" className="text-sm text-gray-700">Has external work</label>
+              </div>
+              {form.has_external_work && (
+                <div>
+                  <label className={labelCls}>Weekly Work Hours</label>
+                  <input type="number" min="0" step="0.5" value={form.weekly_work_hours}
+                    onChange={e => set('weekly_work_hours', e.target.value)} className={fieldCls} />
+                </div>
+              )}
+              <div className="col-span-2 flex items-center gap-2">
+                <input type="checkbox" id="research" checked={form.in_research_group}
+                  onChange={e => set('in_research_group', e.target.checked)}
+                  className="w-4 h-4 accent-indigo-600" />
+                <label htmlFor="research" className="text-sm text-gray-700">In research group</label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2 flex-shrink-0">
+          <button onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition">
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg transition">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function StudentDetailPage() {
-  const { id }     = useParams()
-  const router     = useRouter()
-  const [data, setData] = useState<any>(null)
-  const [err, setErr]   = useState('')
+  const { id }  = useParams()
+  const router  = useRouter()
+  const [data, setData]     = useState<any>(null)
+  const [err, setErr]       = useState('')
+  const [editing, setEditing] = useState(false)
+
+  const currentUser = getUser()
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Both'
 
   useEffect(() => {
     if (!id) return
@@ -28,7 +331,7 @@ export default function StudentDetailPage() {
       .catch(e => setErr(e.message))
   }, [id])
 
-  if (err)  return <div className="text-red-600 p-6">{err}</div>
+  if (err)   return <div className="text-red-600 p-6">{err}</div>
   if (!data) return <div className="text-gray-400 p-6">Loading…</div>
 
   const ppmUs = data.ppm_records.filter((p: any) => p.result === 'US').length
@@ -54,21 +357,29 @@ export default function StudentDetailPage() {
             <p className="text-gray-500 text-sm">{data.student_id_number} · {data.email}</p>
             <p className="text-gray-400 text-xs mt-1">{data.program_full} · {data.faculty}</p>
           </div>
-          {data.risk && (
-            <RiskBadge label={data.risk.risk_label} score={data.risk.risk_score} />
-          )}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {data.risk && <RiskBadge label={data.risk.risk_label} score={data.risk.risk_score} />}
+            {isAdmin && (
+              <button
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-100">
           {[
-            { label: 'Degree',       value: data.degree_type },
-            { label: 'Study Mode',   value: data.study_method },
-            { label: 'Enrolled',     value: data.enrollment_date },
-            { label: 'Entry GPA',    value: data.entry_gpa ?? '—' },
-            { label: 'Campus',       value: data.campus ?? '—' },
-            { label: 'Country',      value: data.country ?? '—' },
-            { label: 'Funding',      value: data.funding ?? '—' },
-            { label: 'Weekly Work',  value: data.has_external_work ? `${data.weekly_work_hours}h/wk` : 'None' },
+            { label: 'Degree',         value: data.degree_type },
+            { label: 'Study Mode',     value: data.study_method },
+            { label: 'Enrolled',       value: data.enrollment_date },
+            { label: 'Entry GPA',      value: data.entry_gpa ?? '—' },
+            { label: 'Campus',         value: data.campus ?? '—' },
+            { label: 'Country',        value: data.country ?? '—' },
+            { label: 'Funding',        value: data.funding ?? '—' },
+            { label: 'Weekly Work',    value: data.has_external_work ? `${data.weekly_work_hours}h/wk` : 'None' },
             { label: 'Family Support', value: data.family_support ? `${data.family_support}/5` : '—' },
           ].map(item => (
             <div key={item.label}>
@@ -121,7 +432,7 @@ export default function StudentDetailPage() {
                 <div className="flex-1 bg-gray-100 rounded-full h-2.5">
                   <div
                     className={`h-2.5 rounded-full ${
-                      data.risk.risk_label === 'High' ? 'bg-red-500' :
+                      data.risk.risk_label === 'High'   ? 'bg-red-500' :
                       data.risk.risk_label === 'Medium' ? 'bg-amber-500' : 'bg-green-500'
                     }`}
                     style={{ width: `${data.risk.risk_score}%` }}
@@ -191,6 +502,14 @@ export default function StudentDetailPage() {
           </div>
         </div>
       </div>
+
+      {editing && (
+        <EditModal
+          data={data}
+          onClose={() => setEditing(false)}
+          onSaved={updated => { setData(updated); setEditing(false) }}
+        />
+      )}
     </div>
   )
 }
