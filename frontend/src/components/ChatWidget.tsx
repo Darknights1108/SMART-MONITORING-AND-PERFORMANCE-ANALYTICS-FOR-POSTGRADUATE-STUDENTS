@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Bot, X, Send, User, Minimize2, Maximize2,
-  RefreshCw, ExternalLink, ChevronDown,
+  RefreshCw, ExternalLink, ChevronDown, PlusCircle,
 } from 'lucide-react'
 import { getToken } from '@/lib/auth'
 import { wsUrl } from '@/lib/api'
@@ -49,6 +49,29 @@ const DEFAULT_COLORS = [
 const INITIAL: Message[] = [
   { id: 0, role: 'assistant', content: "Hi! I'm your AI Assistant. Ask me about students, risks, or deadlines — or ask me to show data as a chart!" },
 ]
+
+const WIDGET_STORAGE_KEY = 'pms-chat-widget-messages-v1'
+
+function getInitialMessages(): Message[] {
+  return INITIAL.map(m => ({ ...m }))
+}
+
+function loadStoredMessages(): Message[] {
+  if (typeof window === 'undefined') return getInitialMessages()
+  try {
+    const raw = window.localStorage.getItem(WIDGET_STORAGE_KEY)
+    if (!raw) return getInitialMessages()
+    const parsed = JSON.parse(raw) as Message[]
+    if (!Array.isArray(parsed) || parsed.length === 0) return getInitialMessages()
+    return parsed
+  } catch {
+    return getInitialMessages()
+  }
+}
+
+function nextMsgId(messages: Message[]): number {
+  return messages.reduce((max, m) => Math.max(max, Number(m.id) || 0), 0) + 1
+}
 
 // ── Chart renderer ─────────────────────────────────────────────────────────────
 function NoData({ title }: { title: string }) {
@@ -265,16 +288,17 @@ function MessageBubble({ m, isExpanded }: { m: Message; isExpanded: boolean }) {
 export default function ChatWidget() {
   const [open, setOpen]           = useState(false)
   const [expanded, setExpanded]   = useState(false)
-  const [messages, setMessages]   = useState<Message[]>(INITIAL)
+  const [messages, setMessages]   = useState<Message[]>(getInitialMessages)
   const [input, setInput]         = useState('')
   const [thinking, setThinking]   = useState(false)
   const [connected, setConnected] = useState(false)
   const [unread, setUnread]       = useState(0)
   const [model, setModel]         = useState<'local' | 'external'>('local')
+  const [storageReady, setStorageReady] = useState(false)
 
   const ws     = useRef<WebSocket | null>(null)
   const endRef  = useRef<HTMLDivElement>(null)
-  const idRef   = useRef(1)
+  const idRef   = useRef(nextMsgId(messages))
   const openRef = useRef(open)
   openRef.current = open
 
@@ -365,6 +389,32 @@ export default function ChatWidget() {
   useEffect(() => { if (open) endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, thinking, open])
   useEffect(() => { if (open) setUnread(0) }, [open])
 
+  // ── Persistence ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const stored = loadStoredMessages()
+    setMessages(stored)
+    idRef.current = nextMsgId(stored)
+    setStorageReady(true)
+  }, [])
+  useEffect(() => {
+    if (!storageReady) return
+    try { window.localStorage.setItem(WIDGET_STORAGE_KEY, JSON.stringify(messages)) } catch {}
+  }, [messages, storageReady])
+
+  // ── New conversation ─────────────────────────────────────────────────────────
+  function handleNewConversation() {
+    const fresh = getInitialMessages()
+    setMessages(fresh)
+    setThinking(false)
+    setInput('')
+    idRef.current = nextMsgId(fresh)
+    try { window.localStorage.removeItem(WIDGET_STORAGE_KEY) } catch {}
+    ws.current?.close()
+    ws.current = null
+    setConnected(false)
+    setTimeout(connect, 100)
+  }
+
   // ── Model switch ─────────────────────────────────────────────────────────────
   function handleModelSwitch(m: 'local' | 'external') {
     if (m === model) return
@@ -429,6 +479,10 @@ export default function ChatWidget() {
                   MiMo
                 </button>
               </div>
+              <button title="New conversation" onClick={handleNewConversation}
+                className="p-1 rounded-lg hover:bg-white/10 transition">
+                <PlusCircle className="w-3.5 h-3.5" />
+              </button>
               <Link href="/chat" title="Open full chat"
                 className="p-1 rounded-lg hover:bg-white/10 transition" onClick={() => setOpen(false)}>
                 <ExternalLink className="w-3.5 h-3.5" />
