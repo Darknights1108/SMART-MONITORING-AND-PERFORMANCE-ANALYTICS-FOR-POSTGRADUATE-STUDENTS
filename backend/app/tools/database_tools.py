@@ -47,19 +47,23 @@ def list_all_students(degree_type: str = "", status: str = "") -> str:
         if not result:
             return "No students found."
 
-        label = f"All students"
+        label = "All students"
         if degree_type:
             label += f" ({degree_type})"
         if status:
             label += f" — status: {status}"
 
-        output = [f"{label}: {len(result)} total\n"]
+        lines = [
+            f"**{label} — {len(result)} total**\n",
+            "| Student ID | Name | Degree | Mode | Program | Faculty | Status |",
+            "|---|---|---|---|---|---|---|",
+        ]
         for row in result:
-            output.append(
-                f"  {row[0]} | {row[1]} | {row[2]} {row[3]} | "
-                f"{row[4]} | {row[5]} | Status: {row[6] or 'N/A'}"
+            lines.append(
+                f"| {row[0]} | {row[1]} | {row[2]} | {row[3]} | "
+                f"{row[4]} | {row[5]} | {row[6] or 'N/A'} |"
             )
-        text_out = "\n".join(output)
+        text_out = "\n".join(lines)
         return sanitize_tool_output(text_out)
     finally:
         db.close()
