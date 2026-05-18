@@ -54,8 +54,7 @@ def filter_students(criteria: str) -> str:
         params["is_part_time"] = 1 if filters["is_part_time"] else 0
 
     if "degree_type" in filters:
-        add_join("prog", "LEFT JOIN program prog ON s.program_id = prog.program_id")
-        wheres.append("prog.degree_type = :degree_type")
+        wheres.append("s.degree_type = :degree_type")
         params["degree_type"] = filters["degree_type"]
 
     if filters.get("ppm_unsatisfactory"):
@@ -120,13 +119,12 @@ def filter_students(criteria: str) -> str:
 
     select_cols = (
         "s.student_id, s.student_name, s.student_id_number, "
-        "COALESCE(prog2.degree_type, '') AS degree_type, "
+        "COALESCE(s.degree_type, '') AS degree_type, "
         "COALESCE(rp2.risk_label, 'N/A') AS risk_label, "
         "s.is_part_time, s.has_external_work, s.is_cross_discipline"
     )
 
     extra_joins = (
-        "LEFT JOIN program prog2 ON s.program_id = prog2.program_id "
         "LEFT JOIN student_risk_prediction rp2 ON s.student_id = rp2.student_id"
     )
 
