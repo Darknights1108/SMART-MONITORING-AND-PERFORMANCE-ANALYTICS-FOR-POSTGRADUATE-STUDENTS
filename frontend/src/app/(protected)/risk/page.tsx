@@ -170,7 +170,7 @@ export default function RiskPage() {
                   <th className="px-4 py-3">Student</th>
                   <th className="px-4 py-3">Program</th>
                   <th className="px-4 py-3">Risk</th>
-                  <th className="px-4 py-3">Score</th>
+
                   <th className="px-4 py-3">Top Risk Factor</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -194,7 +194,7 @@ export default function RiskPage() {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-gray-700">{p.risk_score?.toFixed(1)}</td>
+
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {p.key_risk_factors?.[0] ?? '—'}
                     </td>
