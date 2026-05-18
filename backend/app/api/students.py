@@ -932,6 +932,39 @@ def create_ppm(
         db.close()
 
 
+@router.delete("/api/students/{student_id}/ppm/{ppm_year}/{ppm_cycle}")
+def delete_ppm(
+    student_id: int,
+    ppm_year:   int,
+    ppm_cycle:  int,
+    user: dict = Depends(require_admin),
+):
+    """Delete a PPM cycle record. Admin only."""
+    db = SyncSessionLocal()
+    try:
+        existing = db.execute(text("""
+            SELECT 1 FROM ppm_record
+            WHERE student_id = :sid AND ppm_year = :yr AND ppm_cycle = :cyc
+        """), {"sid": student_id, "yr": ppm_year, "cyc": ppm_cycle}).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="PPM record not found.")
+
+        db.execute(text("""
+            DELETE FROM ppm_record
+            WHERE student_id = :sid AND ppm_year = :yr AND ppm_cycle = :cyc
+        """), {"sid": student_id, "yr": ppm_year, "cyc": ppm_cycle})
+        db.commit()
+        return {"success": True, "message": "PPM record deleted."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 @router.put("/api/students/{student_id}/ppm/{ppm_year}/{ppm_cycle}")
 def update_ppm(
     student_id: int,

@@ -106,6 +106,8 @@ export const createPpm        = (studentId: number, data: any) =>
   req<any>(`/api/students/${studentId}/ppm`, { method: 'POST', body: JSON.stringify(data) })
 export const updatePpm        = (studentId: number, year: number, cycle: number, data: any) =>
   req<any>(`/api/students/${studentId}/ppm/${year}/${cycle}`, { method: 'PUT', body: JSON.stringify(data) })
+export const deletePpm        = (studentId: number, year: number, cycle: number) =>
+  req<any>(`/api/students/${studentId}/ppm/${year}/${cycle}`, { method: 'DELETE' })
 export const createSupervisor = (data: any) =>
   req<any>('/api/supervisors/', { method: 'POST', body: JSON.stringify(data) })
 export const updateSupervisor = (id: number, data: any) =>

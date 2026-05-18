@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft, User, BookOpen, AlertTriangle,
-  CheckCircle, Clock, Pencil, X, Save, Loader2, Plus,
+  CheckCircle, Clock, Pencil, X, Save, Loader2, Plus, Trash2,
 } from 'lucide-react'
 import RiskBadge from '@/components/RiskBadge'
 import {
   getStudent, updateStudent, updateMilestone,
-  createPpm, updatePpm,
+  createPpm, updatePpm, deletePpm,
   getPrograms, getCountries, getDisciplines,
   getFundingTypes, getCampuses,
 } from '@/lib/api'
@@ -454,14 +454,16 @@ const ppmColor = (r: string | null) =>
 
 // ── PPM inline edit row ───────────────────────────────────────────────────────
 function PpmRow({
-  p, studentId, isAdmin, onSaved,
+  p, studentId, isAdmin, onSaved, onDeleted,
 }: {
   p: any
   studentId: number
   isAdmin: boolean
   onSaved: (updated: any) => void
+  onDeleted: (year: number, cycle: number) => void
 }) {
-  const [editing, setEditing] = useState(false)
+  const [editing, setEditing]   = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
   const [form, setForm] = useState({
     result:        p.result        ?? '',
     verify_status: p.verified ? 'Y' : 'N',
@@ -469,6 +471,7 @@ function PpmRow({
     remarks:       p.remarks       ?? '',
   })
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [err, setErr]       = useState('')
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -488,6 +491,15 @@ function PpmRow({
     finally { setSaving(false) }
   }
 
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      await deletePpm(studentId, p.year, p.cycle)
+      onDeleted(p.year, p.cycle)
+    } catch (e: any) { setErr(e.message); setConfirmDel(false) }
+    finally { setDeleting(false) }
+  }
+
   const fieldCls = 'border border-gray-200 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white w-full'
 
   if (!editing) return (
@@ -499,12 +511,32 @@ function PpmRow({
       {p.verified && (
         <span className="text-gray-400" title={`Verified ${p.verify_date ?? ''}`}>✓</span>
       )}
-      {isAdmin && (
-        <button onClick={() => setEditing(true)}
-          className="p-0.5 text-gray-300 hover:text-indigo-500 transition" title="Edit PPM">
-          <Pencil className="w-3 h-3" />
-        </button>
+      {isAdmin && !confirmDel && (
+        <>
+          <button onClick={() => setEditing(true)}
+            className="p-0.5 text-gray-300 hover:text-indigo-500 transition" title="Edit PPM">
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button onClick={() => setConfirmDel(true)}
+            className="p-0.5 text-gray-300 hover:text-red-500 transition" title="Delete PPM">
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </>
       )}
+      {isAdmin && confirmDel && (
+        <span className="flex items-center gap-1.5">
+          <span className="text-red-600 font-medium">Delete?</span>
+          <button onClick={handleDelete} disabled={deleting}
+            className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs disabled:opacity-50">
+            {deleting ? '…' : 'Yes'}
+          </button>
+          <button onClick={() => { setConfirmDel(false); setErr('') }}
+            className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded text-xs">
+            No
+          </button>
+        </span>
+      )}
+      {err && <span className="text-red-500 text-xs">{err}</span>}
     </div>
   )
 
@@ -863,6 +895,14 @@ export default function StudentDetailPage() {
                         ...prev,
                         ppm_records: prev.ppm_records.map((x: any) =>
                           x.year === updated.year && x.cycle === updated.cycle ? updated : x
+                        ),
+                      }))
+                    }
+                    onDeleted={(year, cycle) =>
+                      setData((prev: any) => ({
+                        ...prev,
+                        ppm_records: prev.ppm_records.filter(
+                          (x: any) => !(x.year === year && x.cycle === cycle)
                         ),
                       }))
                     }
