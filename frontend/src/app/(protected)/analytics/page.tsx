@@ -674,7 +674,7 @@ export default function AnalyticsPage() {
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-gray-50 z-10">
               <tr className="text-left text-gray-500 uppercase tracking-wide font-semibold">
-                {['Student','ID','Faculty','Degree','Mode','Year','Lecturer','Risk','Score','RPD Delay'].map(h=>(
+                {['Student','ID','Faculty','Degree','Mode','Year','Lecturer','Risk','RPD Delay'].map(h=>(
                   <th key={h} className="px-3 py-2 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -700,7 +700,6 @@ export default function AnalyticsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 font-semibold text-gray-700">{s.risk_score?.toFixed(1)??'—'}</td>
                   <td className="px-3 py-2">
                     <span className={s.rpd_delay_days>0?'text-red-600 font-semibold':'text-gray-400'}>
                       {s.rpd_delay_days>0?`+${s.rpd_delay_days}d`:`${s.rpd_delay_days}d`}

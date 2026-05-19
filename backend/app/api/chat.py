@@ -10,7 +10,7 @@ from app.services.auth_service import decode_token
 from app.tools.sanitizer import sanitize_user_input
 from app.tools.email_tools import (
     has_pending_sends, execute_pending_sends, clear_pending_sends,
-    stage_email_draft, get_pending_display,
+    stage_email_draft, get_pending_display, set_current_session,
 )
 from app.tools.chart_tool import render_chart
 from app.services.connection_manager import manager
@@ -130,8 +130,13 @@ def _detect_chart_intent(message: str) -> list[dict] | None:
 
 
 def _matches_words(message: str, word_set: set) -> bool:
-    """Return True if any word in word_set appears as a whole word in message."""
+    """Return True only if the message is a SHORT confirmation/cancellation reply.
+    Guards against triggering on full sentences that happen to contain 'send', 'no', etc.
+    A message is only considered a match if it is ≤ 4 words AND contains a word from word_set."""
     msg = message.strip().lower()
+    # Reject long messages — they are new instructions, not confirmations
+    if len(msg.split()) > 4:
+        return False
     if msg in word_set:
         return True
     for w in word_set:
@@ -253,6 +258,9 @@ async def chat_websocket(websocket: WebSocket):
                 })
                 continue
 
+            # Bind this WebSocket session to its own email queue
+            set_current_session(session_id)
+
             # Email confirmation intercept — handle before agent
             if has_pending_sends():
                 if _matches_words(user_message, _CONFIRM_WORDS):
@@ -371,6 +379,10 @@ async def chat_websocket(websocket: WebSocket):
                         })
 
                 agent.step_callbacks.append(_step_callback)
+
+                # Clear any stale pending emails before each new agent run
+                # so multiple tool calls in the same run can accumulate correctly
+                clear_pending_sends()
 
                 async def _run_agent():
                     try:

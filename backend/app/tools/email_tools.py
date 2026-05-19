@@ -15,14 +15,32 @@ from app.database import SyncSessionLocal
 from app.services.email_service import send_email
 from app.config import get_settings
 import asyncio
+import contextvars
 import time
 
 settings = get_settings()
 
 # ---------------------------------------------------------------------------
-# Pending email queue  (staged, not yet sent)
+# Per-session pending email queue (isolated per WebSocket session)
 # ---------------------------------------------------------------------------
-_pending_sends: list[dict] = []   # each entry: {type, id, name, email, subject, body}
+_session_ctx: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "email_session_id", default="__default__"
+)
+_all_pending: dict[str, list[dict]] = {}   # session_id → list of staged emails
+
+
+def set_current_session(session_id: str) -> None:
+    """Bind the current async/thread context to a specific session's queue.
+    Call this in chat.py before each agent run and before execute_pending_sends."""
+    _session_ctx.set(session_id)
+
+
+def _pending() -> list[dict]:
+    """Return the pending-sends list for the active session (creates on demand)."""
+    sid = _session_ctx.get()
+    if sid not in _all_pending:
+        _all_pending[sid] = []
+    return _all_pending[sid]
 
 # ---------------------------------------------------------------------------
 # Rate limit
@@ -64,23 +82,25 @@ def _check_body_content(body: str) -> str | None:
 # ---------------------------------------------------------------------------
 
 def has_pending_sends() -> bool:
-    return bool(_pending_sends)
+    return bool(_pending())
 
 
 def get_pending_summary() -> str:
     """Return a human-readable list of staged emails."""
-    lines = [f"{len(_pending_sends)} email(s) ready to send:"]
-    for i, e in enumerate(_pending_sends, 1):
+    pending = _pending()
+    lines = [f"{len(pending)} email(s) ready to send:"]
+    for i, e in enumerate(pending, 1):
         lines.append(f"  {i}. To: {e['name']} <{e['email']}> — Subject: {e['subject']}")
     return "\n".join(lines)
 
 
 def get_pending_display() -> str:
     """Return the full draft content of all pending emails for user review."""
-    if not _pending_sends:
+    pending = _pending()
+    if not pending:
         return ""
     blocks = []
-    for e in _pending_sends:
+    for e in pending:
         blocks.append(
             f"To: {e['name']} <{e['email']}>\n"
             f"Subject: {e['subject']}\n\n"
@@ -98,13 +118,14 @@ def get_pending_display() -> str:
 
 async def execute_pending_sends() -> str:
     """Actually send all staged emails. Called from chat.py on confirmation."""
-    if not _pending_sends:
+    pending = _pending()
+    if not pending:
         return "No pending emails to send."
 
     results = []
     db = SyncSessionLocal()
     try:
-        for entry in _pending_sends:
+        for entry in list(pending):   # snapshot so we can clear safely
             now = time.time()
             recent = [t for t in _email_send_log if now - t < _RATE_WINDOW]
             _email_send_log.clear()
@@ -133,21 +154,22 @@ async def execute_pending_sends() -> str:
             else:
                 results.append(f"  ✗ Failed to send to {entry['name']}")
 
-        _pending_sends.clear()
+        clear_pending_sends()
         return "Email send results:\n" + "\n".join(results)
     finally:
         db.close()
 
 
 def clear_pending_sends() -> None:
-    """Discard all staged emails (user cancelled)."""
-    _pending_sends.clear()
+    """Discard all staged emails for the current session (user cancelled)."""
+    sid = _session_ctx.get()
+    _all_pending.pop(sid, None)
 
 
 def stage_email_draft(to_email: str, recipient_name: str, subject: str, body: str) -> None:
     """Stage a parsed text draft. Called by chat.py as a fallback when the model
     drafts email as text output instead of calling a tool."""
-    _pending_sends.append({
+    _pending().append({
         "type": "address",
         "name": recipient_name,
         "email": to_email,
@@ -189,8 +211,7 @@ def send_email_to_student(student_search: str, subject: str, body: str) -> str:
 
         student_id, student_name, student_email = student
 
-        _pending_sends.clear()  # replace any previous draft
-        _pending_sends.append({
+        _pending().append({
             "type": "student",
             "student_id": student_id,
             "name": student_name,
@@ -240,8 +261,7 @@ def send_email_to_supervisor(supervisor_search: str, subject: str, body: str) ->
 
         sup_id, sup_name, sup_email = supervisor
 
-        _pending_sends.clear()  # replace any previous draft
-        _pending_sends.append({
+        _pending().append({
             "type": "supervisor",
             "supervisor_id": sup_id,
             "name": sup_name,
@@ -283,8 +303,7 @@ def send_email_to_address(to_email: str, recipient_name: str, subject: str, body
     if body_err:
         return body_err
 
-    _pending_sends.clear()  # replace any previous draft
-    _pending_sends.append({
+    _pending().append({
         "type": "address",
         "name": recipient_name,
         "email": to_email,

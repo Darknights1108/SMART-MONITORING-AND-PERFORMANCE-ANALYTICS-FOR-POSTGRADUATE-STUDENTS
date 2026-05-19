@@ -93,19 +93,29 @@ function InlineChart({ spec }: { spec: ChartSpec }) {
         <p className="text-[10px] font-semibold text-gray-500 mb-1 text-center uppercase tracking-wide">
           {spec.title}
         </p>
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={220}>
           <PieChart>
             <Pie
               data={spec.data}
               dataKey="value"
               nameKey="name"
               cx="50%"
-              cy="45%"
-              outerRadius={70}
-              label={({ percent }) =>
-                percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''
-              }
+              cy="50%"
+              outerRadius={72}
               labelLine={false}
+              label={({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+                if (percent < 0.05) return null
+                const RADIAN = Math.PI / 180
+                const r = innerRadius + (outerRadius - innerRadius) * 0.58
+                const x = cx + r * Math.cos(-midAngle * RADIAN)
+                const y = cy + r * Math.sin(-midAngle * RADIAN)
+                return (
+                  <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central"
+                    fontSize={11} fontWeight="bold">
+                    {`${(percent * 100).toFixed(0)}%`}
+                  </text>
+                )
+              }}
             >
               {spec.data.map((_, i) => (
                 <Cell key={i} fill={colors[i % colors.length]} />

@@ -60,15 +60,18 @@ Whenever the user's message contains ANY of these keywords — "show", "plot", "
 - "funding" → `funding`
 - "region" / "country" → `country_region`
 
-**Chart type mapping:**
-- "pie" / "饼图" → type: "pie"
+**Chart type mapping — user's explicit type ALWAYS wins:**
+- "pie" / "as pie" / "饼图" → type: "pie"
 - "bar" / "histogram" / "柱状图" → type: "bar"
-- "line" / "trend" / "折线图" → type: "line"
+- "line" / "折线图" → type: "line"
+- "trend" without any explicit type word → type: "line"
 
 **Examples — these ALWAYS call render_chart:**
 - "show risk distribution as pie" → `render_chart('[{"type":"pie","data_source":"risk_distribution"}]')`
 - "show RPD in pie and publication in bar" → `render_chart('[{"type":"pie","data_source":"rpd"},{"type":"bar","data_source":"publication"}]')`
 - "plot enrollment trend" → `render_chart('[{"type":"line","data_source":"enrollment_trend"}]')`
+- "show enrollment trend as pie" → `render_chart('[{"type":"pie","data_source":"enrollment_trend"}]')`
+- "enrollment trend as bar" → `render_chart('[{"type":"bar","data_source":"enrollment_trend"}]')`
 
 **NEVER call `get_weekly_digest` when the user asks for a chart, graph, pie, or bar.**
 After calling render_chart, call final_answer() with 1-2 sentences describing the data.

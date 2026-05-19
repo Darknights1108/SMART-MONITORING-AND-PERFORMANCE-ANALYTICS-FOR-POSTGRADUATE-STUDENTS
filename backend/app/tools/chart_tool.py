@@ -150,8 +150,10 @@ def _fetch(db, chart_type: str, source: str) -> dict | None:
             GROUP BY month
             ORDER BY month
         """)).fetchall()
+        if chart_type == "pie":
+            return _format("pie", "Monthly Enrollment Trend", rows)
         return {
-            "type": "line",
+            "type": chart_type if chart_type in ("bar", "line") else "line",
             "title": "Monthly Enrollment Trend",
             "categories": [r[0] for r in rows],
             "values":     [int(r[1]) for r in rows],

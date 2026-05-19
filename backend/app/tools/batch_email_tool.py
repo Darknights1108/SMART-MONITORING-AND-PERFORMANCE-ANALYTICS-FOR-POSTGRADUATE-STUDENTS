@@ -1,7 +1,7 @@
 from smolagents import tool
 from sqlalchemy import text
 from app.database import SyncSessionLocal
-from app.tools.email_tools import _pending_sends, _check_body_content
+from app.tools.email_tools import _pending, clear_pending_sends, _check_body_content
 
 _FILTER_QUERIES: dict[str, str] = {
     "rpd_due_7d": """
@@ -96,7 +96,7 @@ def send_batch_email(filter_criteria: str, subject: str, body_template: str) -> 
     if not rows:
         return f"No students found matching filter '{filter_criteria}'. No emails staged."
 
-    _pending_sends.clear()
+    clear_pending_sends()
     for student_id, student_name, email in rows:
         body = body_template.replace("{name}", student_name or "").replace(
             "{student_id}", str(student_id) if student_id else ""
@@ -105,7 +105,7 @@ def send_batch_email(filter_criteria: str, subject: str, body_template: str) -> 
         # don't appear literally in the sent email (e.g. {risk_score})
         import re as _re
         body = _re.sub(r'\{[^}]+\}', '', body)
-        _pending_sends.append({
+        _pending().append({
             "type": "student",
             "student_id": student_id,
             "name": student_name,
