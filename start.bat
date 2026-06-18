@@ -3,10 +3,6 @@ chcp 65001 >nul
 setlocal EnableDelayedExpansion
 title Postgraduate Monitoring System
 
-:: ================================================================
-::  Postgraduate Monitoring System - Startup Script
-:: ================================================================
-
 echo.
 echo  +------------------------------------------------------+
 echo  ^|      Postgraduate Monitoring System                  ^|
@@ -17,21 +13,32 @@ echo.
 echo [1/5] Checking Docker Desktop...
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
-    echo.
-    echo  ERROR: Docker Desktop is not running.
-    echo  Please start Docker Desktop and try again.
-    echo.
-    pause
-    exit /b 1
+    echo        Docker Desktop is not running. Attempting to start it...
+    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+    echo        Waiting for Docker Desktop to start (up to 60 seconds)...
+    set /a d=0
+    :wait_docker
+    timeout /t 3 /nobreak >nul
+    set /a d+=3
+    docker info >nul 2>&1
+    if %errorlevel% equ 0 goto docker_ok
+    if !d! geq 60 (
+        echo.
+        echo  ERROR: Docker Desktop did not start in time.
+        echo  Please start Docker Desktop manually and try again.
+        echo.
+        pause
+        exit /b 1
+    )
+    goto wait_docker
 )
-echo        OK - Docker Desktop is running.
+:docker_ok
+echo        Docker Desktop is running.
 echo.
 
-:: -- 2. Start all containers -------------------------------------
-echo [2/5] Starting all services (first run may take a few minutes)...
-echo        MariaDB ^| Ollama ^| MLflow ^| Backend ^| Mailpit ^| Frontend
-echo.
-docker compose up -d --build
+:: -- 2. Start backend services (mariadb, ollama, backend, mailpit) --
+echo [2/5] Starting backend services...
+docker compose up -d
 if %errorlevel% neq 0 (
     echo.
     echo  ERROR: docker compose failed. Check the output above.
@@ -39,6 +46,17 @@ if %errorlevel% neq 0 (
     pause
     exit /b 1
 )
+
+:: -- Start frontend container (separate from compose) --------------
+docker inspect datatrain-frontend >nul 2>&1
+if %errorlevel% neq 0 (
+    echo        Frontend container not found. Run setup.bat first.
+    echo.
+    pause
+    exit /b 1
+)
+docker start datatrain-frontend >nul 2>&1
+echo        All services started.
 echo.
 
 :: -- 3. Wait for Backend (FastAPI on :8000) ----------------------
@@ -76,15 +94,15 @@ if %errorlevel% equ 0 goto frontend_ok
 if !tries! geq 150 (
     echo.
     echo  WARNING: Frontend did not respond after 5 minutes.
-    echo  Check logs with:  docker compose logs frontend
+    echo  Check logs with:  docker logs datatrain-frontend
     echo.
     goto open_browsers
 )
 if !tries! equ 1   echo        Waiting for frontend...
-if !tries! equ 30  echo        Still building... (1 min elapsed)
-if !tries! equ 60  echo        Still building... (2 min elapsed)
-if !tries! equ 90  echo        Still building... (3 min elapsed)
-if !tries! equ 120 echo        Still building... (4 min elapsed)
+if !tries! equ 30  echo        Still starting... (1 min elapsed)
+if !tries! equ 60  echo        Still starting... (2 min elapsed)
+if !tries! equ 90  echo        Still starting... (3 min elapsed)
+if !tries! equ 120 echo        Still starting... (4 min elapsed)
 timeout /t 2 /nobreak >nul
 goto wait_frontend
 
@@ -94,13 +112,9 @@ echo.
 
 :: -- 5. Open browsers --------------------------------------------
 :open_browsers
-echo [5/5] Opening browser tabs...
+echo [5/5] Opening browser...
 timeout /t 1 /nobreak >nul
 start "" "http://localhost:3000"
-timeout /t 1 /nobreak >nul
-start "" "http://localhost:5000"
-timeout /t 1 /nobreak >nul
-start "" "http://localhost:8025"
 
 :: -- Done --------------------------------------------------------
 echo.
@@ -109,7 +123,6 @@ echo  ^|           All services are running!                  ^|
 echo  +------------------------------------------------------+
 echo  ^|  App          http://localhost:3000                  ^|
 echo  ^|  API Docs     http://localhost:8000/docs             ^|
-echo  ^|  MLflow       http://localhost:5000                  ^|
 echo  ^|  Mailpit      http://localhost:8025                  ^|
 echo  ^|  Ollama       http://localhost:11434                 ^|
 echo  +------------------------------------------------------+
