@@ -2,6 +2,29 @@
 Agent service - initializes and manages the Smolagents CodeAgent.
 """
 from smolagents import ToolCallingAgent, OpenAIServerModel
+from typing import List, Dict, Optional, Any
+from smolagents.models import Tool, ChatMessage
+
+
+class GPT5CompatibleModel(OpenAIServerModel):
+    """Wraps OpenAIServerModel to strip parameters unsupported by GPT-5 (o-series)."""
+
+    def __call__(
+        self,
+        messages: List[Dict[str, str]],
+        stop_sequences=None,
+        grammar=None,
+        tools_to_call_from=None,
+        **kwargs,
+    ) -> ChatMessage:
+        # GPT-5 does not support stop sequences or grammar
+        return super().__call__(
+            messages,
+            stop_sequences=None,
+            grammar=None,
+            tools_to_call_from=tools_to_call_from,
+            **kwargs,
+        )
 from app.config import get_settings
 from app.tools.database_tools import (
     list_all_students,
@@ -193,12 +216,14 @@ def create_agent(use_external: bool = False) -> ToolCallingAgent:
                       If False, use the local Ollama model (default).
     """
     if use_external and settings.EXTERNAL_MODEL_API_KEY:
-        model = OpenAIServerModel(
+        model = GPT5CompatibleModel(
             model_id=settings.EXTERNAL_MODEL_NAME,
             api_base=settings.EXTERNAL_MODEL_BASE_URL,
             api_key=settings.EXTERNAL_MODEL_API_KEY,
-            max_tokens=4096,
         )
+        # GPT-5 requires max_completion_tokens; smolagents base class injects max_tokens by default
+        model.kwargs.pop("max_tokens", None)
+        model.kwargs["max_completion_tokens"] = 4096
     else:
         model = OpenAIServerModel(
             model_id=settings.OLLAMA_MODEL,

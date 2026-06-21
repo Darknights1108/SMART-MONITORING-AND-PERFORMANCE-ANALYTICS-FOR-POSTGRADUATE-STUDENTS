@@ -194,7 +194,9 @@ export default function ChatPage() {
   const [thinking, setThinking]   = useState(false)
   const [showSteps, setShowSteps] = useState(false)
   const [connected, setConnected] = useState(false)
-  const [model, setModel]         = useState<'local' | 'external'>('local')
+  const [model, setModel]         = useState<'local' | 'external'>(() => {
+    try { return (window.localStorage.getItem('chat_model') as 'local' | 'external') || 'local' } catch { return 'local' }
+  })
   const [storageReady, setStorageReady] = useState(false)
 
   const ws    = useRef<WebSocket | null>(null)
@@ -222,6 +224,7 @@ export default function ChatPage() {
   function handleModelSwitch(m: 'local' | 'external') {
     if (m === model) return
     setModel(m)
+    try { window.localStorage.setItem('chat_model', m) } catch {}
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({ type: 'switch_model', model: m }))
     }
@@ -240,7 +243,9 @@ export default function ChatPage() {
 
       if (data.type === 'auth_success')  { setConnected(true); return }
       if (data.type === 'model_switched') {
-        setModel(data.model === 'external' ? 'external' : 'local')
+        const m = data.model === 'external' ? 'external' : 'local'
+        setModel(m)
+        try { window.localStorage.setItem('chat_model', m) } catch {}
         return
       }
       if (data.type === 'thinking')     { setThinking(true); setSteps([]); return }
@@ -378,7 +383,7 @@ export default function ChatPage() {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {m === 'local' ? 'Local' : 'MiMo'}
+                {m === 'local' ? 'Local' : 'GPT-5'}
               </button>
             ))}
           </div>

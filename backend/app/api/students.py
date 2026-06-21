@@ -23,6 +23,8 @@ from app.services.auth_service import get_current_user, require_admin
 from passlib.context import CryptContext
 import json
 import math
+import threading
+from app.services.ml_service_rf import predict_single_student
 
 router = APIRouter(tags=["students"])
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -667,6 +669,12 @@ def create_student(body: CreateStudentRequest, user: dict = Depends(require_admi
             """), {"sid": student_id, "sup": body.supervisor_id})
 
         db.commit()
+
+        # Trigger immediate risk prediction in background (uses saved model, no re-training)
+        threading.Thread(
+            target=predict_single_student, args=(student_id,), daemon=True
+        ).start()
+
         return {"success": True, "student_id": student_id, "message": f"Student '{body.student_name}' created successfully."}
 
     except HTTPException:

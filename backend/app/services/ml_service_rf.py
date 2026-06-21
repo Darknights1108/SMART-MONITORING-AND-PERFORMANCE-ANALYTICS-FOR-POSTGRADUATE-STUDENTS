@@ -771,6 +771,63 @@ def _store_predictions(predictions: list[dict]) -> None:
         db.close()
 
 
+def predict_single_student(student_id: int) -> bool:
+    """Immediately predict risk for a newly-added student using the saved model (no re-training)."""
+    if not os.path.exists(_RF_S1_PATH):
+        logger.info(f"[RF] No saved model yet — skipping instant prediction for student {student_id}")
+        return False
+    try:
+        model_s1 = joblib.load(_RF_S1_PATH)
+        encoders = joblib.load(_ENC_PATH) if os.path.exists(_ENC_PATH) else None
+
+        df_raw = _extract_db_features()
+        df_raw = df_raw[df_raw["student_id"] == student_id]
+        if df_raw.empty:
+            logger.warning(f"[RF] Student {student_id} not found in DB — skipping instant prediction")
+            return False
+
+        if encoders:
+            df_enc, _ = _encode_features(df_raw, encoders=encoders)
+        else:
+            df_enc, _ = _encode_features(df_raw)
+
+        row   = df_enc.iloc[0]
+        stage = _determine_stage(row)
+
+        if stage == 1:
+            X       = row[STAGE1_FEATURES].fillna(0).values.reshape(1, -1)
+            proba   = model_s1.predict_proba(X)[0]
+            classes = list(model_s1.classes_)
+            p_drop  = float(proba[classes.index(1)]) if 1 in classes else 0.0
+            label   = _proba_to_label(p_drop)
+            score   = round(p_drop * 100, 2)
+            factors = _stage1_factors(row)
+            conf    = round(float(proba.max()), 4)
+        elif stage == 2:
+            rb = _detect_stage2(row)
+            label, score, factors = rb["risk_label"], rb["risk_score"], rb["factors"]
+            conf = 1.0
+        else:
+            rb = _detect_stage3(row)
+            label, score, factors = rb["risk_label"], rb["risk_score"], rb["factors"]
+            conf = 1.0
+
+        _store_predictions([{
+            "student_id":       student_id,
+            "risk_score":       score,
+            "risk_label":       label,
+            "cluster_id":       stage,
+            "key_risk_factors": json.dumps(factors),
+            "stage":            stage,
+            "confidence":       conf,
+        }])
+        logger.info(f"[RF] Instant prediction for student {student_id}: {label} ({score}%)")
+        return True
+    except Exception as e:
+        logger.warning(f"[RF] Instant prediction failed for student {student_id}: {e}")
+        return False
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PART 7 — Query helpers
 # ══════════════════════════════════════════════════════════════════════════════
